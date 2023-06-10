@@ -1,6 +1,6 @@
 import { IsDefined, IsEmail, IsString, IsIn } from "class-validator";
 import { Expose } from "class-transformer";
-import { userRoles } from "../../../mongoose/models/Users";
+import { userRoles } from "../../mongoose/models/Users";
 
 export class RegisterValidation {
   @IsDefined()

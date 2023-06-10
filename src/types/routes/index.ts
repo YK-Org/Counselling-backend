@@ -1,14 +1,4 @@
-import productCategories from "./productCategories";
-import productStatus from "./productStatus";
-import products from "./products";
 import auth from "./auth";
-import subCategories from "./subCategories";
 
-const routes: any = [
-  productCategories,
-  products,
-  productStatus,
-  auth,
-  subCategories,
-];
+const routes: any = [auth];
 export default routes;

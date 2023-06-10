@@ -1,11 +1,11 @@
 import express, { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import AuthService from "../services/auth";
-import UserService from "../services/users";
+import AuthService from "../../services/auth";
+import UserService from "../../services/users";
 import { LoginValidation } from "../validationClasses/auth/login";
-import MiddlewareService from "../middleware/index";
+import MiddlewareService from "../../middleware";
 import { RegisterValidation } from "./../validationClasses/auth/register";
-import { IRegisterResponse } from "../types/interfaces";
+import { IRegisterResponse } from "../../types/interfaces";
 
 const router = express.Router();
 
@@ -17,12 +17,12 @@ const login = async (request: Request, response: Response) => {
 
     if (user && (await bcrypt.compare(password, user[0].password))) {
       const token = AuthService.generateAccessToken(user[0]);
-      response.status(200).send({ token });
+      return response.status(200).send({ token });
     } else {
       throw new Error("Invalid Credentials");
     }
   } catch (error) {
-    response.status(400).send(error);
+    return response.status(400).send(error);
   }
 };
 
@@ -50,9 +50,9 @@ const register = async (request: Request, response: Response) => {
       data.token = token;
     }
 
-    response.status(201).json(user);
-  } catch (err) {
-    console.log(err);
+    return response.status(201).json(user);
+  } catch (err: any) {
+    return response.status(201).json({ message: err.message });
   }
 };
 

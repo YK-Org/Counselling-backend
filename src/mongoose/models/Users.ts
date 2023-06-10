@@ -3,11 +3,11 @@ import hashPassword from "../hooks/pre/userPassword";
 
 const UserSchemaOptions = { toJSON: { virtuals: true }, timestamps: true };
 
-export type IUserRole = "admin" | "salesPerson";
-export const userRoles = ["admin", "salesPerson"];
+export type IUserRole = "admin" | "headCounsellor" | "counsellor";
+export const userRoles = ["admin", "headCounsellor", "counsellor"];
 
-export type IUserStatus = "active" | "pending";
-export const userStatus = ["active", "pending"];
+export type IUserStatus = "active" | "banned";
+export const userStatus = ["active", "banned"];
 
 export interface IUser {
   email: string;
