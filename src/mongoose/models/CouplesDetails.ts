@@ -71,6 +71,11 @@ export interface IOtherInfo {
     boys: string;
     girls: string;
   };
+  parentsRelatedBetter: {
+    childood: string;
+    teens: string;
+    now: string;
+  };
   parentsAlive: Boolean;
   marriedBefore: Boolean;
   typeOfMarriage: string;
@@ -187,6 +192,11 @@ const otherInfoSchema = new Schema<IOtherInfo>({
     boys: String,
     girls: String,
   },
+  parentsRelatedBetter: {
+    childood: String,
+    teens: String,
+    now: String,
+  },
   parentsAlive: Boolean,
   marriedBefore: Boolean,
   typeOfMarriage: String,
@@ -240,7 +250,7 @@ const CouplesDetailsSchema = new Schema<ICouplesDetails>(
   CouplesDetailsSchemaOptions
 );
 
-export const User = mongoose.model<ICouplesDetails>(
+export const CouplesDetails = mongoose.model<ICouplesDetails>(
   "CouplesDetails",
   CouplesDetailsSchema
 );

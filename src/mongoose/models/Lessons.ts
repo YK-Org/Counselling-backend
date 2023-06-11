@@ -15,4 +15,4 @@ const LessonsSchema = new Schema<ILessons>(
   LessonsSchemaOptions
 );
 
-export const User = mongoose.model<ILessons>("Lessons", LessonsSchema);
+export const Lessons = mongoose.model<ILessons>("Lessons", LessonsSchema);
