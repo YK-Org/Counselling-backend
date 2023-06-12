@@ -40,7 +40,7 @@ const mapData: any = {
   Religioninwhichyourpartnergrewup: "partner.religion.grewUp",
   Partnerscurrentreligion: "partner.religion.current",
   Yourreligiousdenomination: "religion.denomination",
-  Partnersreligiousdenomination: "religion.denomination",
+  Partnersreligiousdenomination: "partner.religion.denomination",
   Whichchurchdoyouwishtoattendwhenyoumarry: "churchAfterMarriage",
   Selectwhereyoufallintheorderofbirth: "orderOfBirth",
   Selectwhereyourpartnerfallsintheorderofbirth: "partner.orderOfBirth",
