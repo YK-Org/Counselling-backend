@@ -38,6 +38,28 @@ class CouplesService {
       throw new Error(e.message);
     }
   }
+
+  async countUnassignedCouples() {
+    try {
+      const response = await Couples.find({
+        counsellorId: { $exists: false },
+      }).count();
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  async countCompletedSessions() {
+    try {
+      const response = await Couples.find({
+        completed: true,
+      }).count();
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
 }
 
 export default new CouplesService();

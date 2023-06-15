@@ -12,10 +12,7 @@ class UserService {
     }
   }
 
-  async updateUser(
-    data: IUser,
-    id: Types.ObjectId
-  ) {
+  async updateUser(data: IUser, id: Types.ObjectId) {
     try {
       const response = await User.findByIdAndUpdate(id, data);
       return response;
@@ -46,6 +43,18 @@ class UserService {
     try {
     } catch (e: any) {
       // throw new Error(e.message);
+    }
+  }
+
+  async countAvailableCounsellors() {
+    try {
+      const response = await User.find({
+        role: "counsellor",
+        availability: true,
+      }).count();
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
     }
   }
 }

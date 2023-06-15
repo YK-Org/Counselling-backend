@@ -17,6 +17,7 @@ export interface IUser {
   phoneNumber: string;
   role: IUserRole;
   status: IUserStatus;
+  availability?: boolean;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -28,6 +29,7 @@ const UserSchema = new Schema<IUser>(
     phoneNumber: { type: String, required: false },
     role: { type: String, enum: userRoles, required: true },
     status: { type: String, enum: userStatus, default: "active" },
+    availability: { type: Boolean, required: false },
   },
   UserSchemaOptions
 );

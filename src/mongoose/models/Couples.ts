@@ -12,13 +12,15 @@ export interface ICouples {
   couplesInfo?: Partial<ICouplesDetails>[];
   counsellor?: Partial<IUser>;
   lessons?: Partial<ILessons>;
+  completed: boolean;
 }
 
-const CouplesSchema = new Schema(
+const CouplesSchema = new Schema<ICouples>(
   {
-    counsellorId: { type: Types.ObjectId },
-    partners: [Types.ObjectId],
-    lessonsCompleted: [Types.ObjectId],
+    counsellorId: { type: Schema.Types.ObjectId },
+    partners: [Schema.Types.ObjectId],
+    lessonsCompleted: [Schema.Types.ObjectId],
+    completed: { type: Boolean, default: false },
   },
   CouplesSchemaOptions
 );
