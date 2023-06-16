@@ -5,6 +5,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 const app = express();
-app.use(express.json()).use(cors()).use("/api/v1", routes);
+app.use(express.json());
+app.use(cors());
+
+app.use("/api/v1", routes);
 
 export default app;

@@ -3,6 +3,7 @@ import { transformFormData } from "../helpers/transformFormData";
 import CouplesDetailsService from "../services/couplesDetails";
 import CouplesService from "../services/couples";
 import { get } from "lodash";
+import { getIO } from "../socket";
 
 const router = express.Router();
 
@@ -20,6 +21,8 @@ const addCouples = async (request: Request, response: Response) => {
     } else {
       await CouplesService.createPartner(details._id);
     }
+    const io = getIO();
+    io.to("headcounsellor").emit("formSubmitted");
     return response.status(201).json();
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
