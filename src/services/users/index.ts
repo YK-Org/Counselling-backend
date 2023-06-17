@@ -57,6 +57,24 @@ class UserService {
       throw new Error(e.message);
     }
   }
+
+  async getCounsellors() {
+    try {
+      const response = await User.find({
+        role: "counsellor",
+        status: "active",
+      }).populate({
+        path: "couples",
+        populate: {
+          path: "couplesInfo",
+          select: "name",
+        },
+      });
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
 }
 
 export default new UserService();

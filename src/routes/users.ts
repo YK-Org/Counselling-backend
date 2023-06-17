@@ -1,13 +1,6 @@
 import express, { Request, Response } from "express";
-import bcrypt from "bcrypt";
 import CouplesService from "../services/couples";
 import UserService from "../services/users";
-import { LoginValidation } from "../validationClasses/auth/login";
-import MiddlewareService from "../middleware/index";
-import { RegisterValidation } from "../validationClasses/auth/register";
-import { IRegisterResponse } from "../types/interfaces";
-import { omit } from "lodash";
-import * as jwt from "jsonwebtoken";
 
 const router = express.Router();
 

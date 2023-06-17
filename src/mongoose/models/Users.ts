@@ -43,4 +43,10 @@ UserSchema.pre(
   }
 );
 
+UserSchema.virtual("couples", {
+  ref: "Couples",
+  localField: "_id",
+  foreignField: "counsellorId",
+});
+
 export const User = mongoose.model<IUser>("User", UserSchema);

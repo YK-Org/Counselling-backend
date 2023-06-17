@@ -43,4 +43,20 @@ const unAssignedCouples = async (request: Request, response: Response) => {
 
 router.get("/couples/unassigned", [], unAssignedCouples);
 
+const assignCounsellor = async (request: Request, response: Response) => {
+  try {
+    const { counsellorId } = request.body;
+    const { coupleId } = request.params;
+    const data = await CouplesDetailsService.assignCounsellor(
+      coupleId,
+      counsellorId
+    );
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.put("/assign/counsellor/:coupleId", [], assignCounsellor);
+
 export default router;
