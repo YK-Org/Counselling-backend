@@ -75,6 +75,20 @@ class UserService {
       throw new Error(e.message);
     }
   }
+
+  async searchCounsellors(search: string) {
+    try {
+      const response = await User.find({
+        $or: [
+          { lastName: { $regex: search, $options: "i" } },
+          { firstName: { $regex: search, $options: "i" } },
+        ],
+      });
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
 }
 
 export default new UserService();

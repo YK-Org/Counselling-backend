@@ -34,7 +34,12 @@ router.post("/couples", [], addCouples);
 const unAssignedCouples = async (request: Request, response: Response) => {
   try {
     const data = await CouplesService.getUnassignedCouples();
-    const unassignedCouples = data.map((result) => result.couplesInfo);
+    const unassignedCouples = data.map((result) => {
+      return {
+        couple: result.couplesInfo,
+        id: result._id,
+      };
+    });
     return response.status(200).json(unassignedCouples);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
@@ -58,5 +63,17 @@ const assignCounsellor = async (request: Request, response: Response) => {
 };
 
 router.put("/assign/counsellor/:coupleId", [], assignCounsellor);
+
+const getCouples = async (request: Request, response: Response) => {
+  try {
+    const query = request.query;
+    const data = await CouplesService.getCouples(query);
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.get("/couples", [], getCouples);
 
 export default router;

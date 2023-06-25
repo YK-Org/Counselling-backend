@@ -34,6 +34,7 @@ CouplesSchema.virtual("couplesInfo", {
 CouplesSchema.virtual("counsellor", {
   ref: "User",
   localField: "counsellorId",
+  justOne: true,
   foreignField: "_id",
 });
 

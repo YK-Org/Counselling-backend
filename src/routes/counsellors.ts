@@ -17,4 +17,19 @@ const getCounsellors = async (request: Request, response: Response) => {
 };
 
 router.get("/counsellors", [], getCounsellors);
+
+const searchCounsellors = async (request: Request, response: Response) => {
+  try {
+    const { search } = request.query as any;
+    const data = await UserService.searchCounsellors(search);
+    const result = data.map((result: any) =>
+      omit(result.toObject(), ["password", "__v", "createdAt", "updatedAt"])
+    );
+    return response.status(200).json(result);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.get("/search/counsellors", [], searchCounsellors);
 export default router;

@@ -1,3 +1,4 @@
+import { Couples } from "../../mongoose/models/Couples";
 import {
   CouplesDetails,
   ICouplesDetails,
@@ -24,7 +25,7 @@ class CouplesDetailsService {
 
   async assignCounsellor(coupleId: string, counsellorId: string) {
     try {
-      const response = await CouplesDetails.updateOne(
+      const response = await Couples.findOneAndUpdate(
         { _id: coupleId },
         { counsellorId }
       );
