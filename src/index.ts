@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import { initialize } from "./socket";
 
 const { MONGODB_URL = "", PORT } = process.env;
-console.log("MONGODB_URL", MONGODB_URL);
 try {
   mongoose.connect(MONGODB_URL, {});
 } catch (error) {
