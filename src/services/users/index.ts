@@ -83,7 +83,19 @@ class UserService {
           { lastName: { $regex: search, $options: "i" } },
           { firstName: { $regex: search, $options: "i" } },
         ],
+        role: "counsellor",
       });
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  async createCounsellor(data: IUser) {
+    try {
+      data.role = "counsellor";
+      data.status = "active";
+      const response = await User.create(data);
       return response;
     } catch (e: any) {
       throw new Error(e.message);

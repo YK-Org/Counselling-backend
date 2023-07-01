@@ -32,4 +32,17 @@ const searchCounsellors = async (request: Request, response: Response) => {
 };
 
 router.get("/search/counsellors", [], searchCounsellors);
+
+const createCounsellor = async (request: Request, response: Response) => {
+  try {
+    const body = request.body;
+    const data = await UserService.createCounsellor(body);
+    const result = omit(data, ["password", "__v", "createdAt", "updatedAt"]);
+    return response.status(200).json(result);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.post("/counsellors", [], createCounsellor);
 export default router;

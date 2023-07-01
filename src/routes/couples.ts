@@ -4,6 +4,7 @@ import CouplesDetailsService from "../services/couplesDetails";
 import CouplesService from "../services/couples";
 import { get } from "lodash";
 import { getIO } from "../socket";
+import LessonsService from "../services/lessons";
 
 const router = express.Router();
 
@@ -68,7 +69,8 @@ const getCouples = async (request: Request, response: Response) => {
   try {
     const query = request.query;
     const data = await CouplesService.getCouples(query);
-    return response.status(200).json(data);
+    const totalLessons = await LessonsService.countLessons();
+    return response.status(200).json({ couples: data, totalLessons });
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
   }
