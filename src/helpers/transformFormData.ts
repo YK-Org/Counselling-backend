@@ -106,6 +106,7 @@ const mapData: any = {
   Doyouknowyourhealthstatusofthefollowing: "otherInfo.healthStatus",
   Doyouknowthehealthstatusofyourpartner: "partner.healthStatus",
   Howconfidentareyouthatyourmarriagewillwork: "otherInfo.marriageSuccess",
+  Gender: "gender",
 };
 
 export function transformFormData(data: any) {

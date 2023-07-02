@@ -114,6 +114,7 @@ export interface ICouplesDetails {
   name: string;
   phoneNumber: string;
   dateOfBirth: Date;
+  gender: string;
   hometown: string;
   education: IEducation;
   profession: IProfession;
@@ -236,6 +237,10 @@ const CouplesDetailsSchema = new Schema<ICouplesDetails>(
     name: { type: String, required: true },
     phoneNumber: { type: String },
     dateOfBirth: { type: Date },
+    gender: {
+      type: String,
+      enum: ["male", "female"],
+    },
     hometown: { type: String },
     education: EducationSchema,
     profession: ProfessionSchema,
