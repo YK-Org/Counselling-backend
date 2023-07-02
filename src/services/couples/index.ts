@@ -77,6 +77,22 @@ class CouplesService {
       throw new Error(e.message);
     }
   }
+
+  async getCouple(query: any) {
+    try {
+      const response = await Couples.findOne(query)
+        .populate({
+          path: "couplesInfo",
+        })
+        .populate({
+          path: "counsellor",
+          select: "firstName lastName",
+        });
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
 }
 
 export default new CouplesService();

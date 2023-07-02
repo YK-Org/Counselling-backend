@@ -78,4 +78,16 @@ const getCouples = async (request: Request, response: Response) => {
 
 router.get("/couples", [], getCouples);
 
+const getCouple = async (request: Request, response: Response) => {
+  try {
+    const coupleId = request.params.coupleId;
+    const data = await CouplesService.getCouple({ _id: coupleId });
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.get("/couples/:coupleId", [], getCouple);
+
 export default router;
