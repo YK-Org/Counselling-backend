@@ -5,6 +5,10 @@ import { ILessons } from "./Lessons";
 
 const CouplesSchemaOptions = { toJSON: { virtuals: true }, timestamps: true };
 
+export interface ILessonsCompleted {
+  lessonId: Types.ObjectId;
+  dateCompleted: Date;
+}
 export interface ICouples {
   counsellorId: Types.ObjectId;
   partners: Types.ObjectId[];
@@ -15,11 +19,16 @@ export interface ICouples {
   completed: boolean;
 }
 
+const LessonsCompletedSchema = new Schema<ILessonsCompleted>({
+  lessonId: { type: Schema.Types.ObjectId },
+  dateCompleted: { type: Date },
+});
+
 const CouplesSchema = new Schema<ICouples>(
   {
     counsellorId: { type: Schema.Types.ObjectId },
     partners: [Schema.Types.ObjectId],
-    lessonsCompleted: [Schema.Types.ObjectId],
+    lessonsCompleted: [LessonsCompletedSchema],
     completed: { type: Boolean, default: false },
   },
   CouplesSchemaOptions
