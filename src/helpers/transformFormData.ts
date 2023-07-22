@@ -155,6 +155,8 @@ export function transformFormData(data: any) {
         case "otherInfo.areasHelpNeeded":
           newObj[keyInDb] = value.join(",");
           break;
+        case "gender":
+          newObj[keyInDb] = value.toLowerCase();
         default:
           newObj[keyInDb] = value;
           break;
