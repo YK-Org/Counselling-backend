@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import UserService from "../services/users";
 import { omit } from "lodash";
+import { generatePassword } from "../helpers/generatePassword";
 
 const router = express.Router();
 
@@ -36,6 +37,7 @@ router.get("/search/counsellors", [], searchCounsellors);
 const createCounsellor = async (request: Request, response: Response) => {
   try {
     const body = request.body;
+    body.password = generatePassword();
     const data = await UserService.createCounsellor(body);
     const result = omit(data, ["password", "__v", "createdAt", "updatedAt"]);
     return response.status(200).json(result);
