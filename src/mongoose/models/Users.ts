@@ -29,7 +29,7 @@ const UserSchema = new Schema<IUser>(
     phoneNumber: { type: String, required: false },
     role: { type: String, enum: userRoles, required: true },
     status: { type: String, enum: userStatus, default: "active" },
-    availability: { type: Boolean, required: false },
+    availability: { type: Boolean, required: false, default: true },
   },
   UserSchemaOptions
 );
