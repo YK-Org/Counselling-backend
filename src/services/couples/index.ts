@@ -93,6 +93,20 @@ class CouplesService {
       throw new Error(e.message);
     }
   }
+
+  async updateCoupleLessons(
+    _id: Types.ObjectId | String,
+    data: { lessonId: Types.ObjectId; dateCompleted: Date }
+  ) {
+    try {
+      const response = await Couples.findByIdAndUpdate(_id, {
+        $push: { lessonsCompleted: data },
+      });
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
 }
 
 export default new CouplesService();

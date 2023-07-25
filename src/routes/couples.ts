@@ -90,4 +90,18 @@ const getCouple = async (request: Request, response: Response) => {
 
 router.get("/couples/:coupleId", [], getCouple);
 
+const markLessonAsCompleted = async (request: Request, response: Response) => {
+  try {
+    const coupleId = request.params.coupleId;
+    const body = request.body;
+    await CouplesService.updateCoupleLessons(coupleId, body);
+    const data = await CouplesService.getCouple({ _id: coupleId });
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.put("/couples/complete-lesson/:coupleId", [], markLessonAsCompleted);
+
 export default router;
