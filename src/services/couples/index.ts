@@ -64,6 +64,7 @@ class CouplesService {
   async getCouples(query: any) {
     try {
       const response = await Couples.find(query)
+        .sort({ createdAt: -1 })
         .populate({
           path: "couplesInfo",
           select: "name",

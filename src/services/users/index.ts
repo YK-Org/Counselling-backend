@@ -76,6 +76,21 @@ class UserService {
     }
   }
 
+  async getCounsellor(query: any) {
+    try {
+      const response = await User.findById(query).populate({
+        path: "couples",
+        populate: {
+          path: "couplesInfo",
+          select: "name",
+        },
+      });
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
   async searchCounsellors(search: string) {
     try {
       const response = await User.find({

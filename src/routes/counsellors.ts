@@ -19,6 +19,18 @@ const getCounsellors = async (request: Request, response: Response) => {
 
 router.get("/counsellors", [], getCounsellors);
 
+const getCounsellor = async (request: Request, response: Response) => {
+  try {
+    const counsellorId = request.params.counsellorId;
+    const data = await UserService.getCounsellor({ _id: counsellorId });
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.get("/counsellors/:counsellorId", [], getCounsellor);
+
 const searchCounsellors = async (request: Request, response: Response) => {
   try {
     const { search } = request.query as any;
