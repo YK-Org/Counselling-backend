@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as jwt from "jsonwebtoken";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
+import { get } from "lodash";
 
 class MiddlewareService {
   checkAuthentication = (req: any, res: Response, next: any) => {
@@ -22,7 +23,7 @@ class MiddlewareService {
 
           req.user = user;
 
-          next();
+          return next();
         }
       );
     }
@@ -38,15 +39,40 @@ class MiddlewareService {
           for (const errorItem of errors) {
             errorTexts = errorTexts.concat(errorItem.constraints);
           }
-          res.status(400).send(errorTexts);
-          return;
+          return res.status(400).send(errorTexts);
         } else {
           res.locals.input = output;
-          next();
+          return next();
         }
       });
     };
   };
+
+  canAccessCouple = (req: any, res: Response, next: any) => {
+    const role = get(req, "user.role", "");
+    if (role == "headCounsellor") {
+      return next();
+    }
+
+    const coupleId = req.params.coupleId;
+    const userId = get(req, "user._id", "");
+    if (userId == coupleId) {
+      return next();
+    }
+
+    return res.sendStatus(403);
+  };
+
+  allowedRoles(roles: string[]) {
+    return function (req: any, res: Response, next: any) {
+      const role = req.user.role;
+      if (!roles.includes(role)) {
+        return res.sendStatus(403);
+      }
+
+      return next();
+    };
+  }
 }
 
 export default new MiddlewareService();

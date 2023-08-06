@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import LessonsService from "../services/lessons";
+import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
 
@@ -14,7 +15,11 @@ const addLessons = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/lessons", [], addLessons);
+router.post(
+  "/lessons",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  addLessons
+);
 
 const getLessons = async (request: Request, response: Response) => {
   try {
@@ -26,6 +31,10 @@ const getLessons = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/lessons", [], getLessons);
+router.get(
+  "/lessons",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  getLessons
+);
 
 export default router;

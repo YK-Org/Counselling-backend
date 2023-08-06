@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import UserService from "../services/users";
 import { omit } from "lodash";
 import { generatePassword } from "../helpers/generatePassword";
+import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
 
@@ -17,7 +18,11 @@ const getCounsellors = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/counsellors", [], getCounsellors);
+router.get(
+  "/counsellors",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  getCounsellors
+);
 
 const getCounsellor = async (request: Request, response: Response) => {
   try {
@@ -29,7 +34,11 @@ const getCounsellor = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/counsellors/:counsellorId", [], getCounsellor);
+router.get(
+  "/counsellors/:counsellorId",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  getCounsellor
+);
 
 const searchCounsellors = async (request: Request, response: Response) => {
   try {
@@ -44,7 +53,11 @@ const searchCounsellors = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/search/counsellors", [], searchCounsellors);
+router.get(
+  "/search/counsellors",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  searchCounsellors
+);
 
 const createCounsellor = async (request: Request, response: Response) => {
   try {
@@ -58,5 +71,9 @@ const createCounsellor = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/counsellors", [], createCounsellor);
+router.post(
+  "/counsellors",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  createCounsellor
+);
 export default router;

@@ -5,6 +5,7 @@ import CouplesService from "../services/couples";
 import { get } from "lodash";
 import { getIO } from "../socket";
 import LessonsService from "../services/lessons";
+import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
 
@@ -30,7 +31,11 @@ const addCouples = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/couples", [], addCouples);
+router.post(
+  "/couples",
+  [MiddlewareService.allowedRoles(["headCounsellor", "form"])],
+  addCouples
+);
 
 const unAssignedCouples = async (request: Request, response: Response) => {
   try {
@@ -47,7 +52,11 @@ const unAssignedCouples = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/couples/unassigned", [], unAssignedCouples);
+router.get(
+  "/couples/unassigned",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  unAssignedCouples
+);
 
 const assignCounsellor = async (request: Request, response: Response) => {
   try {
@@ -63,7 +72,14 @@ const assignCounsellor = async (request: Request, response: Response) => {
   }
 };
 
-router.put("/assign/counsellor/:coupleId", [], assignCounsellor);
+router.put(
+  "/assign/counsellor/:coupleId",
+  [
+    MiddlewareService.canAccessCouple,
+    MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
+  ],
+  assignCounsellor
+);
 
 const getCouples = async (request: Request, response: Response) => {
   try {
@@ -76,7 +92,11 @@ const getCouples = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/couples", [], getCouples);
+router.get(
+  "/couples",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  getCouples
+);
 
 const getCouple = async (request: Request, response: Response) => {
   try {
@@ -88,7 +108,14 @@ const getCouple = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/couples/:coupleId", [], getCouple);
+router.get(
+  "/couples/:coupleId",
+  [
+    MiddlewareService.canAccessCouple,
+    MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
+  ],
+  getCouple
+);
 
 const markLessonAsCompleted = async (request: Request, response: Response) => {
   try {
@@ -102,6 +129,13 @@ const markLessonAsCompleted = async (request: Request, response: Response) => {
   }
 };
 
-router.put("/couples/complete-lesson/:coupleId", [], markLessonAsCompleted);
+router.put(
+  "/couples/complete-lesson/:coupleId",
+  [
+    MiddlewareService.canAccessCouple,
+    MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
+  ],
+  markLessonAsCompleted
+);
 
 export default router;

@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import CouplesService from "../services/couples";
 import UserService from "../services/users";
+import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
 
@@ -22,6 +23,10 @@ const dashboardInit = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/dashboard/init", [], dashboardInit);
+router.get(
+  "/dashboard/init",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  dashboardInit
+);
 
 export default router;

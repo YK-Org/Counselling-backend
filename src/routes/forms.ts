@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import FormsService from "../services/forms";
+import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
 
@@ -14,7 +15,11 @@ const addForms = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/forms", [], addForms);
+router.post(
+  "/forms",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  addForms
+);
 
 const getForms = async (request: Request, response: Response) => {
   try {
@@ -26,6 +31,10 @@ const getForms = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/forms", [], getForms);
+router.get(
+  "/forms",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  getForms
+);
 
 export default router;
