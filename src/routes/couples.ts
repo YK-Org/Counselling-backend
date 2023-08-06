@@ -31,11 +31,7 @@ const addCouples = async (request: Request, response: Response) => {
   }
 };
 
-router.post(
-  "/couples",
-  [MiddlewareService.allowedRoles(["headCounsellor", "form"])],
-  addCouples
-);
+router.post("/couples", [], addCouples);
 
 const unAssignedCouples = async (request: Request, response: Response) => {
   try {
