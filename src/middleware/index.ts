@@ -6,10 +6,12 @@ import { get } from "lodash";
 
 class MiddlewareService {
   checkAuthentication = (req: any, res: Response, next: any) => {
-    if (
-      req.path.includes("login") ||
-      (req.path == "/api/v1/couples" && req.method == "POST")
-    ) {
+    const unauthRoutes = [
+      "/api/v1/couples",
+      "/api/v1/forgot-password/request",
+      "api/v1/login",
+    ];
+    if (unauthRoutes.includes(req.path) && req.method == "POST") {
       next();
     } else {
       const authHeader = req.headers["authorization"];
@@ -19,12 +21,12 @@ class MiddlewareService {
       jwt.verify(
         token,
         process.env.TOKEN_SECRET as string,
-        (err: any, user: any) => {
+        (err: any, decoded: any) => {
           console.log(err);
 
           if (err) return res.sendStatus(403);
 
-          req.user = user;
+          req.user = decoded.user;
 
           return next();
         }

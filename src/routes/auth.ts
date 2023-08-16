@@ -8,6 +8,8 @@ import { RegisterValidation } from "../validationClasses/auth/register";
 import { IRegisterResponse } from "../types/interfaces";
 import { omit } from "lodash";
 import * as jwt from "jsonwebtoken";
+import { sendMail } from "../helpers/mailer";
+import { passwordRequestMail } from "../helpers/mailTemplate";
 
 const router = express.Router();
 
@@ -18,16 +20,17 @@ const login = async (request: Request, response: Response) => {
     const user = await UserService.getUsers({ email });
 
     if (user && (await bcrypt.compare(password, user[0].password))) {
-      const token = AuthService.generateAccessToken(user[0]);
+      const userData: any = {
+        ...omit(user[0].toObject(), [
+          "password",
+          "__v",
+          "createdAt",
+          "updatedAt",
+        ]),
+      };
+      const token = AuthService.generateAccessToken(userData);
       const data = {
-        user: {
-          ...omit(user[0].toObject(), [
-            "password",
-            "__v",
-            "createdAt",
-            "updatedAt",
-          ]),
-        },
+        user: userData,
         token,
       };
       return response.status(200).send(data);
@@ -87,7 +90,7 @@ const authCheck = async (request: Request, response: Response) => {
     }
 
     const data = {
-      ...omit(decoded, [
+      ...omit(decoded.user, [
         "password",
         "__v",
         "createdAt",
@@ -104,5 +107,41 @@ const authCheck = async (request: Request, response: Response) => {
 };
 
 router.get("/auth/check", authCheck);
+
+const forgotPasswordRequest = async (request: Request, response: Response) => {
+  try {
+    const email = request.body.email;
+    const user = await UserService.getUsers({ email });
+    if (user) {
+      const userData: any = {
+        ...omit(user[0].toObject(), [
+          "password",
+          "__v",
+          "createdAt",
+          "updatedAt",
+        ]),
+      };
+      const token = AuthService.generateAccessToken(userData, "900s");
+      const link = `${process.env.APP_URL}?tok=${token}`;
+
+      const mailOptions = {
+        from: "Counsellor App <counsellortrinity@gmail.com>",
+        to: email,
+        subject: "Password Reset",
+        text: "Testing",
+        html: passwordRequestMail(link),
+      };
+      await sendMail(mailOptions);
+      console.log("end");
+    } else {
+      throw new Error("User cannot be found");
+    }
+    return response.status(200).send({});
+  } catch (error) {
+    return response.status(400).send(error);
+  }
+};
+
+router.post("/forgot-password/request", [], forgotPasswordRequest);
 
 export default router;
