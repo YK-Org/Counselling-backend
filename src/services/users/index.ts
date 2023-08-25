@@ -12,7 +12,7 @@ class UserService {
     }
   }
 
-  async updateUser(data: IUser, id: Types.ObjectId) {
+  async updateUser(data: Partial<IUser>, id: Types.ObjectId) {
     try {
       const response = await User.findByIdAndUpdate(id, data);
       return response;

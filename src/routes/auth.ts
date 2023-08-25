@@ -18,7 +18,6 @@ const login = async (request: Request, response: Response) => {
     const { email, password } = request.body;
 
     const user = await UserService.getUsers({ email });
-
     if (user && (await bcrypt.compare(password, user[0].password))) {
       const userData: any = {
         ...omit(user[0].toObject(), [
@@ -112,7 +111,7 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
   try {
     const email = request.body.email;
     const user = await UserService.getUsers({ email });
-    if (user) {
+    if (user && user.length) {
       const userData: any = {
         ...omit(user[0].toObject(), [
           "password",
@@ -121,7 +120,11 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
           "updatedAt",
         ]),
       };
-      const token = AuthService.generateAccessToken(userData, "900s");
+      const token = AuthService.generateAccessToken(
+        userData,
+        "passwordReset",
+        "900s"
+      );
       const link = `${process.env.APP_URL}?tok=${token}`;
 
       const mailOptions = {
@@ -132,16 +135,50 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
         html: passwordRequestMail(link),
       };
       await sendMail(mailOptions);
-      console.log("end");
     } else {
       throw new Error("User cannot be found");
     }
     return response.status(200).send({});
-  } catch (error) {
+  } catch (error: any) {
+    console.log("error", error);
     return response.status(400).send(error);
   }
 };
 
 router.post("/forgot-password/request", [], forgotPasswordRequest);
+
+const forgotPasswordReset = async (request: Request, response: Response) => {
+  try {
+    const password = request.body.password;
+    const id = (request as any).user._id;
+    const encryptedUserPassword = await bcrypt.hash(password, 10);
+    const user = await UserService.updateUser(
+      { password: encryptedUserPassword },
+      id
+    );
+    if (user) {
+      const userData: any = {
+        ...omit(user.toObject(), ["password", "__v", "createdAt", "updatedAt"]),
+      };
+      const token = AuthService.generateAccessToken(userData);
+      const data = {
+        user: userData,
+        token,
+      };
+
+      return response.status(200).send(data);
+    } else {
+      throw new Error("Error resetting password");
+    }
+  } catch (error) {
+    return response.status(400).send(error);
+  }
+};
+
+router.post(
+  "/forgot-password/reset",
+  [MiddlewareService.checkPasswordReset],
+  forgotPasswordReset
+);
 
 export default router;

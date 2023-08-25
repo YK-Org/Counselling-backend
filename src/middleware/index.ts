@@ -9,7 +9,8 @@ class MiddlewareService {
     const unauthRoutes = [
       "/api/v1/couples",
       "/api/v1/forgot-password/request",
-      "api/v1/login",
+      "/api/v1/login",
+      "/api/v1/forgot-password/reset",
     ];
     if (unauthRoutes.includes(req.path) && req.method == "POST") {
       next();
@@ -78,6 +79,29 @@ class MiddlewareService {
       return next();
     };
   }
+
+  checkPasswordReset = (req: any, res: Response, next: any) => {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    console.log("token", token);
+    if (token == null) return res.sendStatus(401);
+    jwt.verify(
+      token,
+      process.env.TOKEN_SECRET as string,
+      (err: any, decoded: any) => {
+        console.log(err);
+
+        if (err) return res.sendStatus(403);
+        console.log("decoded", decoded);
+        if (decoded.tokenType !== "passwordReset") {
+          return res.sendStatus(401);
+        }
+        req.user = decoded.user;
+
+        return next();
+      }
+    );
+  };
 }
 
 export default new MiddlewareService();

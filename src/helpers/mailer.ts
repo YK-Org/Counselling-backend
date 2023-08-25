@@ -9,6 +9,7 @@ export const sendMail = async (mailOptions: any) => {
         pass: process.env.GOOGLE_APP_PASSWORD,
       },
     });
+
     const result = await transport.sendMail(mailOptions);
     return result;
   } catch (error) {
