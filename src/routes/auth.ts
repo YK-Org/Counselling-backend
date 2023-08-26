@@ -18,7 +18,11 @@ const login = async (request: Request, response: Response) => {
     const { email, password } = request.body;
 
     const user = await UserService.getUsers({ email });
-    if (user && (await bcrypt.compare(password, user[0].password))) {
+    if (user?.length && user[0].status === "awaitingConfirmation") {
+      throw new Error("Account has not been confirmed");
+    }
+
+    if (user?.length && (await bcrypt.compare(password, user[0].password))) {
       const userData: any = {
         ...omit(user[0].toObject(), [
           "password",
@@ -36,8 +40,8 @@ const login = async (request: Request, response: Response) => {
     } else {
       throw new Error("Invalid Credentials");
     }
-  } catch (error) {
-    return response.status(400).send(error);
+  } catch (error: any) {
+    return response.status(400).send(error.message);
   }
 };
 
@@ -180,5 +184,4 @@ router.post(
   [MiddlewareService.checkPasswordReset],
   forgotPasswordReset
 );
-
 export default router;

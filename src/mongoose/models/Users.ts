@@ -6,8 +6,8 @@ const UserSchemaOptions = { toJSON: { virtuals: true }, timestamps: true };
 export type IUserRole = "admin" | "headCounsellor" | "counsellor";
 export const userRoles = ["admin", "headCounsellor", "counsellor"];
 
-export type IUserStatus = "active" | "banned";
-export const userStatus = ["active", "banned"];
+export type IUserStatus = "active" | "banned" | "awaitingConfirmation";
+export const userStatus = ["active", "banned", "awaitingConfirmation"];
 
 export interface IUser {
   email: string;
@@ -22,13 +22,13 @@ export interface IUser {
 
 const UserSchema = new Schema<IUser>(
   {
-    email: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     password: { type: String, required: true },
     phoneNumber: { type: String, required: false },
     role: { type: String, enum: userRoles, required: true },
-    status: { type: String, enum: userStatus, default: "active" },
+    status: { type: String, enum: userStatus, default: "awaitingConfirmation" },
     availability: { type: Boolean, required: false, default: true },
   },
   UserSchemaOptions

@@ -59,21 +59,4 @@ router.get(
   searchCounsellors
 );
 
-const createCounsellor = async (request: Request, response: Response) => {
-  try {
-    const body = request.body;
-    body.password = generatePassword();
-    const data = await UserService.createCounsellor(body);
-    const result = omit(data, ["password", "__v", "createdAt", "updatedAt"]);
-    return response.status(200).json(result);
-  } catch (err: any) {
-    return response.status(500).json({ message: err.message });
-  }
-};
-
-router.post(
-  "/counsellors",
-  [MiddlewareService.allowedRoles(["headCounsellor"])],
-  createCounsellor
-);
 export default router;
