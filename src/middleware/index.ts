@@ -3,6 +3,7 @@ import * as jwt from "jsonwebtoken";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { get } from "lodash";
+import CouplesService from "../services/couples";
 
 class MiddlewareService {
   checkAuthentication = (req: any, res: Response, next: any) => {
@@ -55,7 +56,7 @@ class MiddlewareService {
     };
   };
 
-  canAccessCouple = (req: any, res: Response, next: any) => {
+  canAccessCouple = async (req: any, res: Response, next: any) => {
     const role = get(req, "user.role", "");
     if (role == "headCounsellor") {
       return next();
@@ -63,7 +64,9 @@ class MiddlewareService {
 
     const coupleId = req.params.coupleId;
     const userId = get(req, "user._id", "");
-    if (userId == coupleId) {
+    const couple = await CouplesService.getCouple({ _id: coupleId });
+
+    if (userId === couple?.counsellorId.toString()) {
       return next();
     }
 
