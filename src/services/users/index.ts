@@ -51,6 +51,7 @@ class UserService {
       const response = await User.find({
         role: "counsellor",
         availability: true,
+        status: "active",
       }).count();
       return response;
     } catch (e: any) {
