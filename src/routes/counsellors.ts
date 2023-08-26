@@ -1,7 +1,6 @@
 import express, { Request, Response } from "express";
 import UserService from "../services/users";
 import { omit } from "lodash";
-import { generatePassword } from "../helpers/generatePassword";
 import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
