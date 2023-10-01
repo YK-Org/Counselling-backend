@@ -18,8 +18,25 @@ class CouplesDetailsService {
     }
   }
 
+  async updateDetails(phoneNumber: string, data: any) {
+    try {
+      const response = await CouplesDetails.findOneAndUpdate(
+        { phoneNumber },
+        data,
+        {
+          upsert: true,
+          new: true,
+        }
+      );
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
   async findPartner(phoneNumber: string) {
     try {
+      phoneNumber = parsePhoneNumber(phoneNumber).number?.e164 || "";
       const response = await CouplesDetails.findOne({ phoneNumber });
       return response;
     } catch (e: any) {

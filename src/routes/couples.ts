@@ -52,19 +52,24 @@ const addCouplesDetails = async (request: Request, response: Response) => {
   try {
     const data = request.body;
     const formattedData = transformFormData(data);
-    const details = await CouplesDetailsService.createDetails(formattedData);
-    const partnerPhoneNumber = get(details, "partner.phoneNumber");
-    const foundPartner = await CouplesDetailsService.findPartner(
-      partnerPhoneNumber
+    const details = await CouplesDetailsService.updateDetails(
+      formattedData.phoneNumber,
+      formattedData
     );
-    if (foundPartner) {
-      await CouplesService.updateWithPartner(foundPartner._id, details._id);
-    } else {
-      await CouplesService.createPartner([details._id]);
+    if (details) {
+      const partnerPhoneNumber = get(details, "partner.phoneNumber", "");
+      const foundPartner = await CouplesDetailsService.findPartner(
+        partnerPhoneNumber
+      );
+      if (foundPartner) {
+        await CouplesService.updateWithPartner(foundPartner._id, details._id);
+      } else {
+        await CouplesService.createPartner([details._id]);
+      }
+      const io = getIO();
+      io.to("headcounsellor").emit("formSubmitted");
+      return response.status(201).json();
     }
-    const io = getIO();
-    io.to("headcounsellor").emit("formSubmitted");
-    return response.status(201).json();
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
   }

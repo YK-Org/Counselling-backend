@@ -8,6 +8,8 @@ class MediaService {
       for (const file of files) {
         const response = await cloudinary.uploader.upload(file.path, {
           folder,
+          type: "authenticated",
+          access_mode: "authenticated",
         });
         uploadedFiles.push(response.secure_url);
         await fs.unlink(file.path);

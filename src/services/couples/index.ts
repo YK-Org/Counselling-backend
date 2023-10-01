@@ -18,7 +18,7 @@ class CouplesService {
     try {
       const response = await Couples.create({
         partners: ids,
-        letter: letterPath,
+        ...(letterPath && { letter: letterPath }),
       });
       return response;
     } catch (e: any) {
