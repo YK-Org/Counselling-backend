@@ -35,7 +35,10 @@ const addCouples = async (request: Request, response: Response) => {
 
     const ids = partners.map((result: any) => result.value._id);
 
-    const couple = await CouplesService.createPartner(ids, uploadedFiles[0]);
+    const couple = await CouplesService.createPartner(
+      ids,
+      uploadedFiles[0] || ""
+    );
     const data = await CouplesService.getCouple({ _id: couple._id });
     return response.status(201).json(data);
   } catch (err: any) {
