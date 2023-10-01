@@ -3,10 +3,14 @@ import {
   CouplesDetails,
   ICouplesDetails,
 } from "../../mongoose/models/CouplesDetails";
+import { parsePhoneNumber } from "awesome-phonenumber";
 
 class CouplesDetailsService {
-  async createDetails(data: ICouplesDetails) {
+  async createDetails(data: Partial<ICouplesDetails>) {
     try {
+      if (data.phoneNumber) {
+        data.phoneNumber = parsePhoneNumber(data.phoneNumber).number?.e164;
+      }
       const response = await CouplesDetails.create(data);
       return response;
     } catch (e: any) {

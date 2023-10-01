@@ -58,4 +58,20 @@ router.get(
   searchCounsellors
 );
 
+const updateCounsellor = async (request: Request, response: Response) => {
+  try {
+    const counsellorId = request.params.counsellorId;
+    const body = request.body;
+    const data = await UserService.updateUser(body, counsellorId);
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.put(
+  "/counsellors/:counsellorId",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  updateCounsellor
+);
 export default router;

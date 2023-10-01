@@ -14,10 +14,11 @@ class CouplesService {
     }
   }
 
-  async createPartner(_id: Types.ObjectId) {
+  async createPartner(ids: Types.ObjectId[], letterPath?: string) {
     try {
       const response = await Couples.create({
-        partners: [_id],
+        partners: ids,
+        letter: letterPath,
       });
       return response;
     } catch (e: any) {

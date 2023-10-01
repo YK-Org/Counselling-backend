@@ -5,11 +5,47 @@ import CouplesService from "../services/couples";
 import { get } from "lodash";
 import { getIO } from "../socket";
 import LessonsService from "../services/lessons";
+import MediaService from "../services/media";
 import MiddlewareService from "../middleware/index";
+import multer from "multer";
+const upload = multer({ dest: "uploads/" });
 
 const router = express.Router();
 
 const addCouples = async (request: Request, response: Response) => {
+  try {
+    const body = request.body;
+    let uploadedFiles: string[] = [];
+    if (request.file) {
+      uploadedFiles = await MediaService.uploadFiles([request.file]);
+    }
+
+    const partners = await Promise.allSettled([
+      await CouplesDetailsService.createDetails({
+        name: body.manName,
+        phoneNumber: body.manNumber,
+        gender: "male",
+      }),
+      await CouplesDetailsService.createDetails({
+        name: body.womanName,
+        phoneNumber: body.womanNumber,
+        gender: "female",
+      }),
+    ]);
+
+    const ids = partners.map((result: any) => result.value._id);
+
+    const couple = await CouplesService.createPartner(ids, uploadedFiles[0]);
+    const data = await CouplesService.getCouple({ _id: couple._id });
+    return response.status(201).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.post("/couples", [upload.single("file")], addCouples);
+
+const addCouplesDetails = async (request: Request, response: Response) => {
   try {
     const data = request.body;
     const formattedData = transformFormData(data);
@@ -21,7 +57,7 @@ const addCouples = async (request: Request, response: Response) => {
     if (foundPartner) {
       await CouplesService.updateWithPartner(foundPartner._id, details._id);
     } else {
-      await CouplesService.createPartner(details._id);
+      await CouplesService.createPartner([details._id]);
     }
     const io = getIO();
     io.to("headcounsellor").emit("formSubmitted");
@@ -31,7 +67,7 @@ const addCouples = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/couples", [], addCouples);
+router.post("/couples/details", [], addCouplesDetails);
 
 const unAssignedCouples = async (request: Request, response: Response) => {
   try {

@@ -12,12 +12,12 @@ class UserService {
     }
   }
 
-  async updateUser(data: Partial<IUser>, id: Types.ObjectId) {
+  async updateUser(data: Partial<IUser>, id: Types.ObjectId | string) {
     try {
-      const response = await User.findByIdAndUpdate(id, data);
+      const response = await User.findByIdAndUpdate(id, data, { new: true });
       return response;
     } catch (e: any) {
-      // throw new Error(e.message);
+      throw new Error(e.message);
     }
   }
 
@@ -63,7 +63,6 @@ class UserService {
     try {
       const response = await User.find({
         role: "counsellor",
-        status: "active",
       }).populate({
         path: "couples",
         populate: {

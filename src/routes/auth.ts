@@ -104,7 +104,6 @@ const authCheck = async (request: Request, response: Response) => {
     };
     return response.status(201).json(data);
   } catch (err: any) {
-    console.log(err);
     return response.status(401).json({ message: err.message });
   }
 };
