@@ -61,8 +61,14 @@ const addCouplesDetails = async (request: Request, response: Response) => {
       const foundPartner = await CouplesDetailsService.findPartner(
         partnerPhoneNumber
       );
+
       if (foundPartner) {
-        await CouplesService.updateWithPartner(foundPartner._id, details._id);
+        const couple = await CouplesService.getCouple({
+          partners: { $in: foundPartner._id },
+        });
+        if (couple && !couple.partners.includes(details._id)) {
+          await CouplesService.updateWithPartner(foundPartner._id, details._id);
+        }
       } else {
         await CouplesService.createPartner([details._id]);
       }
