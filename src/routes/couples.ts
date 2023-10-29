@@ -184,4 +184,27 @@ router.put(
   markLessonAsCompleted
 );
 
+const acceptDeclineCouple = async (request: Request, response: Response) => {
+  try {
+    const { acceptDecline } = request.body;
+    const { coupleId } = request.params;
+    const data = await CouplesDetailsService.acceptDeclineCouple(
+      coupleId,
+      acceptDecline
+    );
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.put(
+  "/confirm/couple/:coupleId",
+  [
+    MiddlewareService.canAccessCouple,
+    MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
+  ],
+  acceptDeclineCouple
+);
+
 export default router;

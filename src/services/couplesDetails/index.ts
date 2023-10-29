@@ -48,7 +48,19 @@ class CouplesDetailsService {
     try {
       const response = await Couples.findOneAndUpdate(
         { _id: coupleId },
-        { counsellorId }
+        { counsellorId, counsellorAccepted: "" }
+      );
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  async acceptDeclineCouple(coupleId: string, acceptDecline: string) {
+    try {
+      const response = await Couples.findOneAndUpdate(
+        { _id: coupleId },
+        { counsellorAccepted: "acceptDecline" }
       );
       return response;
     } catch (e: any) {

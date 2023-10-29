@@ -18,6 +18,7 @@ export interface ICouples {
   lessons?: Partial<ILessons>;
   completed: boolean;
   letter: string;
+  counsellorAccepted: String;
 }
 
 const LessonsCompletedSchema = new Schema<ILessonsCompleted>({
@@ -32,6 +33,7 @@ const CouplesSchema = new Schema<ICouples>(
     lessonsCompleted: [LessonsCompletedSchema],
     completed: { type: Boolean, default: false },
     letter: { type: String, default: "" },
+    counsellorAccepted: { type: String },
   },
   CouplesSchemaOptions
 );
