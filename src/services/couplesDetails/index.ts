@@ -58,10 +58,18 @@ class CouplesDetailsService {
 
   async acceptDeclineCouple(coupleId: string, acceptDecline: string) {
     try {
-      const response = await Couples.findOneAndUpdate(
-        { _id: coupleId },
-        { counsellorAccepted: "acceptDecline" }
-      );
+      let data = {};
+      if (acceptDecline === "accept") {
+        data = {
+          counsellorAccepted: acceptDecline,
+        };
+      } else if (acceptDecline === "decline") {
+        data = {
+          counsellorAccepted: "",
+          counsellorId: null,
+        };
+      }
+      const response = await Couples.findOneAndUpdate({ _id: coupleId }, data);
       return response;
     } catch (e: any) {
       throw new Error(e.message);
