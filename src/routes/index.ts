@@ -5,6 +5,7 @@ import counsellors from "./counsellors";
 import lessons from "./lessons";
 import forms from "./forms";
 import reports from "./reports";
+import assignments from "./assignments";
 
 const routes: any = [
   auth,
@@ -14,5 +15,6 @@ const routes: any = [
   lessons,
   forms,
   reports,
+  assignments,
 ];
 export default routes;
