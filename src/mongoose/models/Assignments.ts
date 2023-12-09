@@ -11,14 +11,14 @@ export interface ILessonsCompleted {
 }
 export interface IAssignments {
   couplesId: Types.ObjectId;
-  lessonId: Types.ObjectId[];
+  lessonId: Types.ObjectId;
   uploads: String[];
 }
 
 const AssignmentsSchema = new Schema<IAssignments>(
   {
     couplesId: { type: Schema.Types.ObjectId },
-    lessonId: [Schema.Types.ObjectId],
+    lessonId: Schema.Types.ObjectId,
     uploads: [String],
   },
   AssignmentsSchemaOptions
