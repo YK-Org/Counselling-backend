@@ -28,19 +28,19 @@ class AssignmentsService {
   }
 
   async createAssignment({
-    assignmentPath,
+    uploads,
     couplesId,
-    lessonsId,
+    lessonId,
   }: {
-    assignmentPath: string[];
+    uploads: string[];
     couplesId: string;
-    lessonsId: string;
+    lessonId: string;
   }) {
     try {
       const response = await Assignments.create({
         couplesId,
-        lessonsId,
-        uploads: assignmentPath,
+        lessonId,
+        uploads,
       });
       return response;
     } catch (e: any) {
