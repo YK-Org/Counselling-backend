@@ -15,8 +15,8 @@ const addAssignments = async (request: Request, response: Response) => {
       uploadedFiles = await MediaService.uploadFiles(request.files);
     }
     body.uploads = uploadedFiles;
-    const data = await AssignmentsService.createAssignment(body);
-
+    const result = await AssignmentsService.createAssignment(body);
+    const data = await AssignmentsService.getAssignment({ _id: result.id });
     return response.status(201).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
