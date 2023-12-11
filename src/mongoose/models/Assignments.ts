@@ -34,6 +34,7 @@ AssignmentsSchema.virtual("lesson", {
   ref: "Lessons",
   localField: "lessonId",
   foreignField: "_id",
+  justOne: true,
 });
 
 export const Assignments = mongoose.model<IAssignments>(
