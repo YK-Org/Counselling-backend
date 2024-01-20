@@ -41,9 +41,9 @@ const deleteAssignments = async (request: Request, response: Response) => {
       _id: assignmentsId,
     });
     if (assignment && assignment.uploads.length) {
-      await MediaService.deleteUploadedFiles(assignment.uploads);
+      await MediaService.deleteFilesInDrive(assignment.uploads);
     }
-    // await AssignmentsService.deleteAssignment(assignmentsId);
+    await AssignmentsService.deleteAssignment(assignmentsId);
     return response.status(201).json({});
   } catch (err: any) {
     return response.status(500).json({ message: err.message });

@@ -60,6 +60,21 @@ class MediaService {
     }
   }
 
+  async deleteFilesInDrive(files: any) {
+    try {
+      const result = await this.authorize();
+      const drive = await google.drive({ version: "v3", auth: result });
+      for (const file of files) {
+        await drive.files.delete({
+          fileId: file,
+        });
+      }
+      return;
+    } catch (error: any) {
+      throw new Error(error.message);
+    }
+  }
+
   async uploadFiles(files: any, folder = "counselling") {
     try {
       const uploadedFiles: string[] = [];
