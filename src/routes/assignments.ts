@@ -12,7 +12,9 @@ const addAssignments = async (request: Request, response: Response) => {
     const body = request.body;
     let uploadedFiles: string[] = [];
     if (request.files) {
-      uploadedFiles = await MediaService.uploadFiles(request.files);
+      console.log("ygyg", request.files.length);
+      // await MediaService.authorize();
+      uploadedFiles = await MediaService.uploadFilesToDrive(request.files);
     }
     body.uploads = uploadedFiles;
     const result = await AssignmentsService.createAssignment(body);
@@ -30,6 +32,28 @@ router.post(
     upload.array("files"),
   ],
   addAssignments
+);
+
+const deleteAssignments = async (request: Request, response: Response) => {
+  try {
+    const { assignmentsId } = request.params;
+    const assignment = await AssignmentsService.getAssignment({
+      _id: assignmentsId,
+    });
+    if (assignment && assignment.uploads.length) {
+      await MediaService.deleteUploadedFiles(assignment.uploads);
+    }
+    // await AssignmentsService.deleteAssignment(assignmentsId);
+    return response.status(201).json({});
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.delete(
+  "/assignments/:assignmentsId",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  deleteAssignments
 );
 
 const getAssignments = async (request: Request, response: Response) => {

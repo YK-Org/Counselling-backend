@@ -47,6 +47,14 @@ class AssignmentsService {
       throw new Error(e.message);
     }
   }
+
+  async deleteAssignment(assignmentId: string) {
+    try {
+      await Assignments.deleteOne({ _id: assignmentId });
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
 }
 
 export default new AssignmentsService();
