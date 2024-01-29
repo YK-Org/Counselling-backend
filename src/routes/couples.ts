@@ -8,6 +8,9 @@ import LessonsService from "../services/lessons";
 import MediaService from "../services/media";
 import MiddlewareService from "../middleware/index";
 import multer from "multer";
+import { assignCounsellorMail } from "../helpers/mailTemplate";
+import UsersDetailsService from "../services/users";
+import { sendMail } from "../helpers/mailer";
 const upload = multer({ dest: "uploads/" });
 
 const router = express.Router();
@@ -112,6 +115,20 @@ const assignCounsellor = async (request: Request, response: Response) => {
       coupleId,
       counsellorId
     );
+
+    const counsellor = await UsersDetailsService.getUser(counsellorId);
+    const couple = await CouplesService.getCouple({ _id: coupleId });
+    const name1 = get(couple, "couplesInfo[0].name", "");
+    const name2 = get(couple, "couplesInfo[1].name", "");
+    const link = `${process.env.APP_URL}`;
+    const mailOptions = {
+      from: "Counsellor App <counsellortrinity@gmail.com>",
+      to: counsellor?.email,
+      subject: "Counseling Assignment Confirmation",
+      text: "",
+      html: assignCounsellorMail({ name1, name2 }, link),
+    };
+    await sendMail(mailOptions);
     return response.status(200).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });

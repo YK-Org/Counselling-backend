@@ -128,13 +128,13 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
         "passwordReset",
         "900s"
       );
-      const link = `${process.env.APP_URL}?tok=${token}`;
+      const link = `${process.env.APP_URL}/password/reset?tok=${token}`;
 
       const mailOptions = {
         from: "Counsellor App <counsellortrinity@gmail.com>",
         to: email,
         subject: "Password Reset",
-        text: "Testing",
+        text: "",
         html: passwordRequestMail(link),
       };
       await sendMail(mailOptions);
