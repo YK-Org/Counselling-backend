@@ -120,7 +120,7 @@ const assignCounsellor = async (request: Request, response: Response) => {
     const couple = await CouplesService.getCouple({ _id: coupleId });
     const name1 = get(couple, "couplesInfo[0].name", "");
     const name2 = get(couple, "couplesInfo[1].name", "");
-    const link = `${process.env.APP_URL}`;
+    const link = `${process.env.APP_URL}/couple/confirmation`;
     const mailOptions = {
       from: "Counsellor App <counsellortrinity@gmail.com>",
       to: counsellor?.email,
