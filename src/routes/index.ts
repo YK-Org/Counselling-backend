@@ -6,6 +6,7 @@ import lessons from "./lessons";
 import forms from "./forms";
 import reports from "./reports";
 import assignments from "./assignments";
+import media from "./media";
 
 const routes: any = [
   auth,
@@ -16,5 +17,6 @@ const routes: any = [
   forms,
   reports,
   assignments,
+  media,
 ];
 export default routes;

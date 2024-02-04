@@ -75,6 +75,29 @@ class MediaService {
     }
   }
 
+  async viewFileInDrive(fileId: string) {
+    try {
+      const result = await this.authorize();
+      const drive = await google.drive({ version: "v3", auth: result });
+
+      const expirationTime = 3600;
+      const permissionParams = {
+        fileId,
+        resource: {
+          role: "reader",
+          type: "anyone",
+        },
+      };
+      const permissions = await drive.permissions.create(permissionParams);
+
+      return `https://drive.google.com/file/d/${fileId}/view?usp=sharing&permissions=${
+        permissions.data.id
+      }&expiry=${Math.floor(Date.now() / 1000) + expirationTime}`;
+    } catch (error: any) {
+      throw new Error(error.message);
+    }
+  }
+
   async uploadFiles(files: any, folder = "counselling") {
     try {
       const uploadedFiles: string[] = [];
