@@ -1,9 +1,14 @@
 import { v2 as cloudinary } from "cloudinary";
 import * as fs from "fs/promises";
+import { createWriteStream } from "fs";
 const path = require("path");
 const createReadStream = require("fs").createReadStream;
 const { google } = require("googleapis");
-const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.metadata.readonly",
+];
 
 class MediaService {
   async authorize() {
@@ -80,19 +85,29 @@ class MediaService {
       const result = await this.authorize();
       const drive = await google.drive({ version: "v3", auth: result });
 
-      const expirationTime = 3600;
-      const permissionParams = {
-        fileId,
-        resource: {
-          role: "reader",
-          type: "anyone",
-        },
-      };
-      const permissions = await drive.permissions.create(permissionParams);
-
-      return `https://drive.google.com/file/d/${fileId}/view?usp=sharing&permissions=${
-        permissions.data.id
-      }&expiry=${Math.floor(Date.now() / 1000) + expirationTime}`;
+      return new Promise((resolve, reject) => {
+        const dest = createWriteStream("downloadedFile.png");
+        drive.files.get(
+          { fileId: fileId, alt: "media" },
+          { responseType: "stream" },
+          (err: any, res: any) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            res.data
+              .on("end", () => {
+                console.log("Done");
+                resolve({});
+              })
+              .on("error", (err: any) => {
+                console.log("Error", err);
+                reject(err);
+              })
+              .pipe(dest);
+          }
+        );
+      });
     } catch (error: any) {
       throw new Error(error.message);
     }
