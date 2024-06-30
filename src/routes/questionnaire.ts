@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import QuestionnaireService from "../services/questionnaire";
 import { omit } from "lodash";
+import MiddlewareService from "../middleware/index";
 
 const router = express.Router();
 
@@ -47,5 +48,28 @@ const postTest = async (request: Request, response: Response) => {
 };
 
 router.post("/questionnaire/post-test", [], postTest);
+
+const getQuestionnaire = async (request: Request, response: Response) => {
+  try {
+    const coupleId = request.params.coupleId;
+    const type = request.params.type as any;
+    const data = await QuestionnaireService.getQuestionnaireByType(
+      coupleId,
+      type
+    );
+    return response.status(200).json(data);
+  } catch (err: any) {
+    return response.status(500).json({ message: err.message });
+  }
+};
+
+router.get(
+  "/questionnaire/couples/:coupleId",
+  [
+    MiddlewareService.canAccessCouple,
+    MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
+  ],
+  getQuestionnaire
+);
 
 export default router;
