@@ -85,6 +85,10 @@ class CouplesService {
       const response = await Couples.findOne(query)
         .populate({
           path: "couplesInfo",
+          populate: {
+            path: "questionnaire",
+            select: "response",
+          },
         })
         .populate({
           path: "counsellor",

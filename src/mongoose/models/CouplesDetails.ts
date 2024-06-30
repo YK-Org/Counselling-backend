@@ -1,4 +1,5 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { HydratedDocument, Schema } from "mongoose";
+import { ICouples } from "./Couples";
 
 const CouplesDetailsSchemaOptions = {
   toJSON: { virtuals: true },
@@ -125,6 +126,7 @@ export interface ICouplesDetails {
   orderOfBirth: string;
   siblings: ISiblings;
   otherInfo: IOtherInfo;
+  couple?: HydratedDocument<ICouples>;
 }
 
 const EducationSchema = new Schema<IEducation>({
@@ -254,6 +256,18 @@ const CouplesDetailsSchema = new Schema<ICouplesDetails>(
   },
   CouplesDetailsSchemaOptions
 );
+
+CouplesDetailsSchema.virtual("questionnaire", {
+  ref: "Questionnaire",
+  localField: "_id",
+  foreignField: "partnerId",
+});
+
+CouplesDetailsSchema.virtual("couple", {
+  ref: "Couples",
+  localField: "_id",
+  foreignField: "partners",
+});
 
 export const CouplesDetails = mongoose.model<ICouplesDetails>(
   "CouplesDetails",

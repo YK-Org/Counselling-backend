@@ -34,10 +34,18 @@ class CouplesDetailsService {
     }
   }
 
-  async findPartner(phoneNumber: string) {
+  async findPartner(phoneNumber: string, expand?: string[]) {
     try {
+      let populate = [];
+      if (expand && expand.includes("couple")) {
+        populate.push({
+          path: "couple",
+        });
+      }
       phoneNumber = parsePhoneNumber(phoneNumber).number?.e164 || "";
-      const response = await CouplesDetails.findOne({ phoneNumber });
+      const response = await CouplesDetails.findOne({ phoneNumber }).populate(
+        populate
+      );
       return response;
     } catch (e: any) {
       throw new Error(e.message);

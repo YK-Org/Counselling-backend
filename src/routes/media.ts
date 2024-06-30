@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 import MediaService from "../services/media";
-import MiddlewareService from "../middleware/index";
 const path = require("path");
 const router = express.Router();
 const fs = require("fs");
