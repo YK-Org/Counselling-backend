@@ -17,13 +17,10 @@ export interface IQuestionnaire {
   type: "pre-test" | "post-test";
 }
 
-const ResponseSchema = new Schema<IResponse>(
-  {
-    question: { type: String, required: true, unique: true },
-    answer: { type: String, required: true },
-  },
-  QuestionnaireSchemaOptions
-);
+const ResponseSchema = new Schema<IResponse>({
+  question: { type: String, required: true, unique: true },
+  answer: { type: String, required: true },
+});
 
 const QuestionnaireSchema = new Schema<IQuestionnaire>(
   {

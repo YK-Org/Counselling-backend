@@ -9,11 +9,11 @@ class QuestionnaireService {
   ) {
     try {
       const data = await CouplesDetailsService.findPartner(contact);
-
       const result = await Questionnaire.create({
         partnerId: data?._id,
-        coupleId: data?.couple?._id,
+        coupleId: data?._id,
         response,
+        type,
       });
       return result;
     } catch (e: any) {

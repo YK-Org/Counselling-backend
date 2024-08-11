@@ -14,6 +14,8 @@ class MiddlewareService {
       "/api/v1/forgot-password/reset",
       "/api/v1/register",
       "/api/v1/couples/details",
+      "/api/v1/questionnaire/pre-test",
+      "/api/v1/questionnaire/post-test",
     ];
     if (unauthRoutes.includes(req.path) && req.method == "POST") {
       next();

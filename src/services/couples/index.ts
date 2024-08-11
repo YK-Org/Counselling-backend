@@ -96,6 +96,7 @@ class CouplesService {
         });
       return response;
     } catch (e: any) {
+      console.log("ygyg", e.message);
       throw new Error(e.message);
     }
   }
