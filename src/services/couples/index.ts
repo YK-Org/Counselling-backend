@@ -87,7 +87,7 @@ class CouplesService {
           path: "couplesInfo",
           populate: {
             path: "questionnaire",
-            select: "response",
+            select: "response type",
           },
         })
         .populate({
