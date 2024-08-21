@@ -9,7 +9,6 @@ const preTest = async (request: Request, response: Response) => {
   try {
     const data = request.body;
     const contact = data["Contact"];
-    console.log(" const contact", contact);
     const questions = omit(data, ["Contact", "Name"]);
     const formatQuestions = Object.keys(questions).map((item) => ({
       question: item,
