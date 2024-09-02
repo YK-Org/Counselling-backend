@@ -4,9 +4,11 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { get } from "lodash";
 import CouplesService from "../services/couples";
+import UsersService from "../services/users";
+import { JwtPayload } from "jsonwebtoken";
 
 class MiddlewareService {
-  checkAuthentication = (req: any, res: Response, next: any) => {
+  checkAuthentication = async (req: any, res: Response, next: any) => {
     const unauthRoutes = [
       "/api/v1/couples",
       "/api/v1/forgot-password/request",
@@ -24,19 +26,26 @@ class MiddlewareService {
       const token = authHeader && authHeader.split(" ")[1];
 
       if (token == null) return res.sendStatus(401);
-      jwt.verify(
-        token,
-        process.env.TOKEN_SECRET as string,
-        (err: any, decoded: any) => {
-          console.log(err);
 
-          if (err) return res.sendStatus(403);
+      try {
+        const decoded = jwt.verify(
+          token,
+          process.env.TOKEN_SECRET as string
+        ) as JwtPayload;
 
-          req.user = decoded.user;
-
-          return next();
+        req.user = decoded.user;
+        const user = await UsersService.getUser(req.user._id);
+        if (!user || (user && decoded.iat !== user.tokenIssuedAt)) {
+          return res
+            .status(403)
+            .json({ message: "Token has been invalidated." });
         }
-      );
+
+        next();
+      } catch (err) {
+        console.error(err);
+        return res.sendStatus(403);
+      }
     }
   };
 

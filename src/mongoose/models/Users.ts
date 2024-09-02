@@ -18,6 +18,7 @@ export interface IUser {
   role: IUserRole;
   status: IUserStatus;
   availability?: boolean;
+  tokenIssuedAt?: number;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -30,6 +31,7 @@ const UserSchema = new Schema<IUser>(
     role: { type: String, enum: userRoles, required: true },
     status: { type: String, enum: userStatus, default: "awaitingConfirmation" },
     availability: { type: Boolean, required: false, default: true },
+    tokenIssuedAt: { type: Number, required: true },
   },
   UserSchemaOptions
 );

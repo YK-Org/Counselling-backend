@@ -1,4 +1,4 @@
-import * as jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { IUser } from "./../../mongoose/models/Users";
 import { HydratedDocument } from "mongoose";
 
@@ -15,11 +15,17 @@ class AuthService {
     };
     try {
       const tok = jwt.sign(data, secret, { expiresIn: expires });
-      return tok;
+      const decodedToken = jwt.decode(tok);
+
+      let issuedAt;
+      if (decodedToken) {
+        issuedAt = (decodedToken as jwt.JwtPayload).iat;
+      }
+      return { token: tok, issuedAt };
     } catch (error) {
       console.log("tg", error);
     }
-    return "";
+    return { token: "", issuedAt: 0 };
   };
 }
 

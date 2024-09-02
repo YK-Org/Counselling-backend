@@ -34,8 +34,15 @@ const login = async (request: Request, response: Response) => {
       const token = AuthService.generateAccessToken(userData);
       const data = {
         user: userData,
-        token,
+        token: token.token,
       };
+
+      await UserService.updateUser(
+        {
+          tokenIssuedAt: token.issuedAt,
+        },
+        user[0].id
+      );
       return response.status(200).send(data);
     } else {
       throw new Error("Invalid Credentials");
@@ -66,7 +73,14 @@ const register = async (request: Request, response: Response) => {
     let data = {} as IRegisterResponse;
     if (user) {
       const token = AuthService.generateAccessToken(user);
-      data.token = token;
+      data.token = token.token;
+
+      await UserService.updateUser(
+        {
+          tokenIssuedAt: token.issuedAt,
+        },
+        user.id
+      );
     }
 
     return response.status(201).json(user);
@@ -128,7 +142,7 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
         "passwordReset",
         "900s"
       );
-      const link = `${process.env.APP_URL}/password/reset?tok=${token}`;
+      const link = `${process.env.APP_URL}/password/reset?tok=${token.token}`;
 
       const mailOptions = {
         from: "Counsellor App <counsellortrinity@gmail.com>",
@@ -166,8 +180,15 @@ const forgotPasswordReset = async (request: Request, response: Response) => {
       const token = AuthService.generateAccessToken(userData);
       const data = {
         user: userData,
-        token,
+        token: token.token,
       };
+
+      await UserService.updateUser(
+        {
+          tokenIssuedAt: token.issuedAt,
+        },
+        user.id
+      );
 
       return response.status(200).send(data);
     } else {
