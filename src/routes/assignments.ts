@@ -10,10 +10,8 @@ const router = express.Router();
 const addAssignments = async (request: Request, response: Response) => {
   try {
     const body = request.body;
-    let uploadedFiles: string[] = [];
+    let uploadedFiles: { id: string; name: string }[] = [];
     if (request.files) {
-      console.log("ygyg", request.files.length);
-      // await MediaService.authorize();
       uploadedFiles = await MediaService.uploadFilesToDrive(request.files);
     }
     body.uploads = uploadedFiles;

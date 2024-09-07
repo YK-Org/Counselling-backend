@@ -38,7 +38,7 @@ class MediaService {
     try {
       const result = await this.authorize();
       const drive = await google.drive({ version: "v3", auth: result });
-      const uploadedFiles: string[] = [];
+      const uploadedFiles: { id: string; name: string }[] = [];
       for (const file of files) {
         const uploadedFile = await drive.files.create({
           media: {
@@ -49,14 +49,17 @@ class MediaService {
               )
             ),
           },
-          fields: "id",
+          fields: "id, name",
           requestBody: {
-            name: file.filename,
+            name: `${file.filename}/${file.originalname}`,
             parents: [process.env.FOLDER_ID],
           },
         });
 
-        uploadedFiles.push(uploadedFile.data.id);
+        uploadedFiles.push({
+          id: uploadedFile.data.id,
+          name: uploadedFile.data.name,
+        });
         await fs.unlink(file.path);
       }
       return uploadedFiles;
@@ -71,7 +74,7 @@ class MediaService {
       const drive = await google.drive({ version: "v3", auth: result });
       for (const file of files) {
         await drive.files.delete({
-          fileId: file,
+          fileId: file.id,
         });
       }
       return;
