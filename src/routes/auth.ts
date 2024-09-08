@@ -204,4 +204,25 @@ router.post(
   [MiddlewareService.checkPasswordReset],
   forgotPasswordReset
 );
+
+const confirmPassword = async (request: Request, response: Response) => {
+  try {
+    const password = request.body.password;
+    const id = (request as any).user._id;
+    const user = await UserService.getUser(id);
+    const checkPassword = await bcrypt.compare(password, user?.password || "");
+    if (!checkPassword) {
+      throw new Error("Invalid credentials");
+    }
+    return response.status(200).send({});
+  } catch (error: any) {
+    return response.status(400).send(error.message);
+  }
+};
+
+router.post(
+  "/confirm-password",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  confirmPassword
+);
 export default router;
