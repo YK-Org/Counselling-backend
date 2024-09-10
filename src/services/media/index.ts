@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import * as fs from "fs/promises";
 import { createWriteStream } from "fs";
+import { get } from "lodash";
 const path = require("path");
 const createReadStream = require("fs").createReadStream;
 const { google } = require("googleapis");
@@ -34,8 +35,12 @@ class MediaService {
     return jwtClient;
   }
 
-  async uploadFilesToDrive(files: any) {
+  async uploadFilesToDrive(files: any, uploadType: string) {
     try {
+      const mapFolders = {
+        assignments: process.env.ASSIGNMENTS_FOLDER_ID,
+        lessons: process.env.LESSONS_FOLDER_ID,
+      };
       const result = await this.authorize();
       const drive = await google.drive({ version: "v3", auth: result });
       const uploadedFiles: { id: string; name: string }[] = [];
@@ -45,14 +50,14 @@ class MediaService {
             body: createReadStream(
               path.resolve(
                 __dirname,
-                `../../../uploads/assignments/${file.filename}`
+                `../../../uploads/${uploadType}/${file.filename}`
               )
             ),
           },
           fields: "id, name",
           requestBody: {
             name: `${file.filename}/${file.originalname}`,
-            parents: [process.env.FOLDER_ID],
+            parents: [get(mapFolders, uploadType)],
           },
         });
 

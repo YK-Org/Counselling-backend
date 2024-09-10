@@ -12,7 +12,10 @@ const addAssignments = async (request: Request, response: Response) => {
     const body = request.body;
     let uploadedFiles: { id: string; name: string }[] = [];
     if (request.files) {
-      uploadedFiles = await MediaService.uploadFilesToDrive(request.files);
+      uploadedFiles = await MediaService.uploadFilesToDrive(
+        request.files,
+        "assignments"
+      );
     }
     body.uploads = uploadedFiles;
     const result = await AssignmentsService.createAssignment(body);

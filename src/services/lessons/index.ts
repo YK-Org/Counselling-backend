@@ -17,6 +17,24 @@ class LessonsService {
       throw new Error(e.message);
     }
   }
+
+  async getLesson(query: any) {
+    try {
+      const response = await Lessons.findOne(query);
+      return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  async deleteLesson(lessonId: string) {
+    try {
+      await Lessons.deleteOne({ _id: lessonId });
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
   async countLessons(query = {}) {
     try {
       const response = await Lessons.find(query).count();
