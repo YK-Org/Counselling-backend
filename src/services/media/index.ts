@@ -2,6 +2,7 @@ import { v2 as cloudinary } from "cloudinary";
 import * as fs from "fs/promises";
 import { createWriteStream } from "fs";
 import { get } from "lodash";
+import { ulid } from "ulid";
 const path = require("path");
 const createReadStream = require("fs").createReadStream;
 const { google } = require("googleapis");
@@ -88,34 +89,48 @@ class MediaService {
     }
   }
 
-  async viewFileInDrive(fileId: string) {
-    try {
-      const result = await this.authorize();
-      const drive = await google.drive({ version: "v3", auth: result });
-
-      return new Promise((resolve, reject) => {
-        const dest = createWriteStream("downloadedFile.png");
-        drive.files.get(
-          { fileId: fileId, alt: "media" },
-          { responseType: "stream" },
-          (err: any, res: any) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            res.data
-              .on("end", () => {
-                console.log("Done");
-                resolve({});
-              })
-              .on("error", (err: any) => {
-                console.log("Error", err);
-                reject(err);
-              })
-              .pipe(dest);
+  async getFromGoogleDrive(fileId: string): Promise<string> {
+    const result = await this.authorize();
+    const drive = await google.drive({ version: "v3", auth: result });
+    const id = ulid();
+    return new Promise((resolve, reject) => {
+      const dest = createWriteStream(`${id}.png`);
+      drive.files.get(
+        { fileId: fileId, alt: "media" },
+        { responseType: "stream" },
+        (err: any, res: any) => {
+          if (err) {
+            reject(err);
+            return;
           }
-        );
-      });
+          res.data
+            .on("end", () => {
+              console.log("Done");
+              resolve(id);
+            })
+            .on("error", (err: any) => {
+              console.log("Error", err);
+              reject(err);
+            })
+            .pipe(dest);
+        }
+      );
+    });
+  }
+
+  async viewFileInDrive(fileId: string | string[]): Promise<string[]> {
+    try {
+      let ids: string[] = [];
+      if (Array.isArray(fileId)) {
+        for (const item of fileId) {
+          const response = await this.getFromGoogleDrive(item);
+          ids.push(response);
+        }
+      } else {
+        const response = await this.getFromGoogleDrive(fileId);
+        ids = [response];
+      }
+      return ids;
     } catch (error: any) {
       throw new Error(error.message);
     }
