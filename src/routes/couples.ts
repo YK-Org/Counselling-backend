@@ -11,16 +11,20 @@ import multer from "multer";
 import { assignCounsellorMail } from "../helpers/mailTemplate";
 import UsersDetailsService from "../services/users";
 import { sendMail } from "../helpers/mailer";
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "uploads/letters/" });
 
 const router = express.Router();
 
 const addCouples = async (request: Request, response: Response) => {
   try {
     const body = request.body;
-    let uploadedFiles: string[] = [];
+    let uploadedFiles: { id: string; name: string }[] = [];
+
     if (request.file) {
-      uploadedFiles = await MediaService.uploadFiles([request.file]);
+      uploadedFiles = await MediaService.uploadFilesToDrive(
+        [request.file],
+        "letters"
+      );
     }
 
     const partners = await Promise.allSettled([
@@ -37,11 +41,8 @@ const addCouples = async (request: Request, response: Response) => {
     ]);
 
     const ids = partners.map((result: any) => result.value._id);
-
-    const couple = await CouplesService.createPartner(
-      ids,
-      uploadedFiles[0] || ""
-    );
+    console.log("uploadedFiles", uploadedFiles);
+    const couple = await CouplesService.createPartner(ids, uploadedFiles[0]);
     const data = await CouplesService.getCouple({ _id: couple._id });
     return response.status(201).json(data);
   } catch (err: any) {

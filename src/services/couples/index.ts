@@ -14,7 +14,10 @@ class CouplesService {
     }
   }
 
-  async createPartner(ids: Types.ObjectId[], letterPath?: string) {
+  async createPartner(
+    ids: Types.ObjectId[],
+    letterPath?: { id: string; name: string }
+  ) {
     try {
       const response = await Couples.create({
         partners: ids,

@@ -32,7 +32,10 @@ const CouplesSchema = new Schema<ICouples>(
     partners: [Schema.Types.ObjectId],
     lessonsCompleted: [LessonsCompletedSchema],
     completed: { type: Boolean, default: false },
-    letter: { type: String, default: "" },
+    letter: {
+      id: String,
+      name: String,
+    },
     counsellorAccepted: { type: String },
   },
   CouplesSchemaOptions
