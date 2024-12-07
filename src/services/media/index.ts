@@ -3,6 +3,7 @@ import * as fs from "fs/promises";
 import { createWriteStream } from "fs";
 import { get } from "lodash";
 import { ulid } from "ulid";
+import { extension } from "mime-types";
 const path = require("path");
 const createReadStream = require("fs").createReadStream;
 const { google } = require("googleapis");
@@ -95,25 +96,43 @@ class MediaService {
     const drive = await google.drive({ version: "v3", auth: result });
     const id = ulid();
     return new Promise((resolve, reject) => {
-      const dest = createWriteStream(`${id}.png`);
       drive.files.get(
-        { fileId: fileId, alt: "media" },
-        { responseType: "stream" },
-        (err: any, res: any) => {
+        {
+          fileId: fileId,
+          fields: "mimeType",
+        },
+        (err: any, fileRes: any) => {
           if (err) {
+            console.error("Error retrieving file metadata:", err);
             reject(err);
             return;
           }
-          res.data
-            .on("end", () => {
-              console.log("Done");
-              resolve(id);
-            })
-            .on("error", (err: any) => {
-              console.log("Error", err);
-              reject(err);
-            })
-            .pipe(dest);
+
+          const mimeType = fileRes.data.mimeType;
+          const ext = extension(mimeType) || "bin";
+          const destFileName = `${id}.${ext}`;
+          const dest = createWriteStream(destFileName);
+
+          drive.files.get(
+            { fileId: fileId, alt: "media" },
+            { responseType: "stream" },
+            (err: any, res: any) => {
+              if (err) {
+                reject(err);
+                return;
+              }
+              res.data
+                .on("end", () => {
+                  console.log("Download complete");
+                  resolve(destFileName);
+                })
+                .on("error", (err: any) => {
+                  console.error("Download error:", err);
+                  reject(err);
+                })
+                .pipe(dest);
+            }
+          );
         }
       );
     });
@@ -121,17 +140,17 @@ class MediaService {
 
   async viewFileInDrive(fileId: string | string[]): Promise<string[]> {
     try {
-      let ids: string[] = [];
+      let fileNames: string[] = [];
       if (Array.isArray(fileId)) {
         for (const item of fileId) {
           const response = await this.getFromGoogleDrive(item);
-          ids.push(response);
+          fileNames.push(response);
         }
       } else {
         const response = await this.getFromGoogleDrive(fileId);
-        ids = [response];
+        fileNames = [response];
       }
-      return ids;
+      return fileNames;
     } catch (error: any) {
       throw new Error(error.message);
     }

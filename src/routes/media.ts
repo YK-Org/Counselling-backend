@@ -10,8 +10,10 @@ const viewMedia = async (request: Request, response: Response) => {
     const archive = archiver("zip", {
       zlib: { level: 9 },
     });
-    const ids = await MediaService.viewFileInDrive(request.body.mediaIds);
-    const files = ids.map((id) => path.resolve(__dirname, `../../${id}.png`));
+    const data = await MediaService.viewFileInDrive(request.body.mediaIds);
+    const files = data.map((fileName) =>
+      path.resolve(__dirname, `../../${fileName}`)
+    );
     if (files.length > 1) {
       archive.on("error", (err: any) => {
         response.status(500).send({ error: err.message });
