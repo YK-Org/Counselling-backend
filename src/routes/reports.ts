@@ -56,7 +56,7 @@ const getCompletedSessions = async (request: Request, response: Response) => {
   try {
     const data = await Couples.aggregate([
       {
-        $match: { completed: false },
+        $match: { completed: true },
       },
       {
         $group: {
@@ -83,7 +83,7 @@ const getAgeDistribution = async (request: Request, response: Response) => {
   try {
     const maleData = await CouplesDetails.aggregate([
       {
-        $match: { gender: "male" },
+        $match: { gender: "male", dateOfBirth: { $exists: true, $ne: null } },
       },
       {
         $addFields: {
@@ -126,7 +126,7 @@ const getAgeDistribution = async (request: Request, response: Response) => {
 
     const femaleData = await CouplesDetails.aggregate([
       {
-        $match: { gender: "female" },
+        $match: { gender: "female", dateOfBirth: { $exists: true, $ne: null } },
       },
       {
         $addFields: {
