@@ -97,6 +97,7 @@ class UserService {
         $or: [
           { lastName: { $regex: search, $options: "i" } },
           { firstName: { $regex: search, $options: "i" } },
+          { availability: { $regex: search, $options: "i" } },
         ],
         role: "counsellor",
       });
