@@ -9,14 +9,6 @@ const router = express.Router();
 const addLessons = async (request: Request, response: Response) => {
   try {
     const body = request.body;
-    let uploadedFiles: { id: string; name: string }[] = [];
-    if (request.files) {
-      uploadedFiles = await MediaService.uploadFilesToDrive(
-        request.files,
-        "lessons"
-      );
-    }
-    body.uploads = uploadedFiles;
     const data = await LessonsService.createLessons(body);
 
     return response.status(201).json(data);
@@ -53,9 +45,6 @@ const deleteLessons = async (request: Request, response: Response) => {
     const lesson = await LessonsService.getLesson({
       _id: lessonsId,
     });
-    if (lesson && lesson.uploads && lesson.uploads.length) {
-      await MediaService.deleteFilesInDrive(lesson.uploads);
-    }
     await LessonsService.deleteLesson(lessonsId);
     return response.status(201).json({});
   } catch (err: any) {

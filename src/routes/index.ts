@@ -8,6 +8,7 @@ import reports from "./reports";
 import assignments from "./assignments";
 import media from "./media";
 import questionnaire from "./questionnaire";
+import resources from "./resources";
 
 const routes: any = [
   auth,
@@ -20,5 +21,6 @@ const routes: any = [
   assignments,
   media,
   questionnaire,
+  resources,
 ];
 export default routes;

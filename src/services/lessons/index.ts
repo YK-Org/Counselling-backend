@@ -11,7 +11,7 @@ class LessonsService {
   }
   async getLessons(query: any) {
     try {
-      const response = await Lessons.find(query).sort({ order: 1 });
+      const response = await Lessons.find(query);
       return response;
     } catch (e: any) {
       throw new Error(e.message);
