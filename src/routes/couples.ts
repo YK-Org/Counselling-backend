@@ -54,6 +54,7 @@ router.post("/couples", [upload.single("file")], addCouples);
 
 const addCouplesDetails = async (request: Request, response: Response) => {
   try {
+    console.log("request", request);
     const data = request.body;
     const formattedData = transformFormData(data);
     const details = await CouplesDetailsService.updateDetails(
@@ -76,8 +77,8 @@ const addCouplesDetails = async (request: Request, response: Response) => {
       } else {
         await CouplesService.createPartner([details._id]);
       }
-      const io = getIO();
-      io.to("headcounsellor").emit("formSubmitted");
+      // const io = getIO();
+      // io.to(`headcounsellor-${user._id}`).emit("formSubmitted");
       return response.status(201).json();
     }
   } catch (err: any) {

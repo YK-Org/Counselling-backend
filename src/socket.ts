@@ -26,7 +26,7 @@ export function initialize(server: any) {
     // Connection now authenticated to receive further events
     const user = socket.decoded;
     if (user && user.role === "headCounsellor") {
-      socket.join("headcounsellor");
+      socket.join(`headcounsellor-${user._id}`);
     } else {
       socket.join(`counsellor-${user._id}`);
     }
