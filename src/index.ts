@@ -7,7 +7,7 @@ const { MONGODB_URL = "", PORT, CLOUD_NAME, API_KEY, API_SECRET } = process.env;
 try {
   mongoose.connect(MONGODB_URL, {});
 } catch (error) {
-  console.log("tfty", error);
+  console.error(error);
 }
 
 cloudinary.config({

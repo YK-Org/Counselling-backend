@@ -156,7 +156,6 @@ export function transformFormData(data: any) {
           newObj[keyInDb] = value.join(",");
           break;
         case "gender":
-          console.log("uygyu", value);
           newObj[keyInDb] = value.toLowerCase();
           break;
         default:
