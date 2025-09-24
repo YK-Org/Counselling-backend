@@ -9,6 +9,7 @@ class QuestionnaireService {
   ) {
     try {
       const data = await CouplesDetailsService.findPartner(contact, ["couple"]);
+      console.log("tghu", data);
       const result = await Questionnaire.create({
         partnerId: data?._id,
         coupleId: data?.couple?._id,
