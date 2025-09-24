@@ -24,11 +24,11 @@ export function initialize(server: any) {
     }
   }).on("connection", function (socket: any) {
     // Connection now authenticated to receive further events
-    const user = socket.decoded;
-    if (user && user.role === "headCounsellor") {
+    const body = socket.decoded;
+    if (body.user && body.user.role === "headCounsellor") {
       socket.join(`headcounsellor`);
     } else {
-      socket.join(`counsellor-${user._id}`);
+      socket.join(`counsellor-${body.user._id}`);
     }
   });
 }
