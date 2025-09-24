@@ -8,10 +8,10 @@ class QuestionnaireService {
     type: "pre-test" | "post-test"
   ) {
     try {
-      const data = await CouplesDetailsService.findPartner(contact);
+      const data = await CouplesDetailsService.findPartner(contact, ["couple"]);
       const result = await Questionnaire.create({
         partnerId: data?._id,
-        coupleId: data?._id,
+        coupleId: data?.couple?._id,
         response,
         type,
       });
