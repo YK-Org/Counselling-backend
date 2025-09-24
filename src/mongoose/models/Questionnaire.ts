@@ -24,7 +24,7 @@ const ResponseSchema = new Schema<IResponse>({
 
 const QuestionnaireSchema = new Schema<IQuestionnaire>(
   {
-    partnerId: { type: String, required: true, unique: true },
+    partnerId: { type: String, required: true },
     coupleId: { type: String, required: true },
     response: [ResponseSchema],
     type: { type: String, required: true },
