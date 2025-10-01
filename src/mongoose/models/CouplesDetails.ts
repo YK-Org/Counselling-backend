@@ -3,6 +3,7 @@ import { ICouples } from "./Couples";
 
 const CouplesDetailsSchemaOptions = {
   toJSON: { virtuals: true },
+  toObject: { virtuals: true },
   timestamps: true,
 };
 
@@ -267,6 +268,7 @@ CouplesDetailsSchema.virtual("couple", {
   ref: "Couples",
   localField: "_id",
   foreignField: "partners",
+  justOne: true,
 });
 
 export const CouplesDetails = mongoose.model<ICouplesDetails>(
