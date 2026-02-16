@@ -19,6 +19,7 @@ export interface IUser {
   status: IUserStatus;
   availability?: boolean;
   tokenIssuedAt?: number;
+  profilePicture?: string;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -32,6 +33,7 @@ const UserSchema = new Schema<IUser>(
     status: { type: String, enum: userStatus, default: "awaitingConfirmation" },
     availability: { type: Boolean, required: false, default: true },
     tokenIssuedAt: { type: Number, required: true },
+    profilePicture: { type: String, required: false },
   },
   UserSchemaOptions
 );

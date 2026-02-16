@@ -43,6 +43,7 @@ class MediaService {
         assignments: process.env.ASSIGNMENTS_FOLDER_ID,
         lessons: process.env.LESSONS_FOLDER_ID,
         letters: process.env.LETTERS_FOLDER_ID,
+        "profile-pictures": process.env.PROFILE_PICTURES_FOLDER_ID,
       };
       const result = await this.authorize();
       const drive = await google.drive({ version: "v3", auth: result });
