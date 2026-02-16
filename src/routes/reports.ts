@@ -475,25 +475,45 @@ const getCounsellorStatistics = async (
       (c) => !counsellorsWithSessions.has(c._id.toString())
     ).length;
 
-    // Build counsellor progress table with status
-    const counsellorProgressTable = counsellorWorkload.map((c) => {
-      let status = "Good";
+    // Build counsellor progress table with status - include ALL counsellors
+    const workloadMap = new Map(
+      counsellorWorkload.map((c) => [c.counsellorId?.toString(), c])
+    );
 
-      // Determine status based on completion rate and workload
-      if (c.completionRate < 30 && c.totalSessions > 0) {
-        status = "Needs support";
-      } else if (c.totalSessions > 5 && c.completionRate < 50) {
-        status = "Needs support";
-      } else if (c.completionRate >= 70) {
-        status = "Excellent";
+    const counsellorProgressTable = allCounsellorsData.map((counsellor) => {
+      const workloadData = workloadMap.get(counsellor._id.toString());
+      const counsellorName = `${counsellor.firstName} ${counsellor.lastName}`;
+
+      let ongoing = 0;
+      let completed = 0;
+      let total = 0;
+      let completionRate = 0;
+      let status = "No sessions";
+
+      if (workloadData) {
+        ongoing = workloadData.ongoingSessions;
+        completed = workloadData.completedSessions;
+        total = workloadData.totalSessions;
+        completionRate = workloadData.completionRate;
+
+        // Determine status based on completion rate and workload
+        if (completionRate < 30 && total > 0) {
+          status = "Needs support";
+        } else if (total > 5 && completionRate < 50) {
+          status = "Needs support";
+        } else if (completionRate >= 70) {
+          status = "Excellent";
+        } else if (total > 0) {
+          status = "Good";
+        }
       }
 
       return {
-        counsellor: c.counsellorName,
-        ongoing: c.ongoingSessions,
-        completed: c.completedSessions,
-        total: c.totalSessions,
-        completion: Math.round(c.completionRate * 100) / 100 + "%",
+        counsellor: counsellorName,
+        ongoing,
+        completed,
+        total,
+        completion: Math.round(completionRate * 100) / 100 + "%",
         status,
       };
     });
