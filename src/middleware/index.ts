@@ -68,6 +68,27 @@ class MiddlewareService {
     };
   };
 
+  queryValidation = (validationClass: any) => {
+    return function (req: Request, res: Response, next: NextFunction) {
+      const output: any = plainToInstance(validationClass, req.query);
+      validate(output, { skipMissingProperties: false }).then((errors: any) => {
+        // errors is an array of validation errors
+        if (errors.length > 0) {
+          const errorMessages = errors.map((error: any) => {
+            return Object.values(error.constraints || {}).join(", ");
+          });
+          return res.status(400).json({
+            message: "Validation failed",
+            errors: errorMessages,
+          });
+        } else {
+          req.query = output; // Replace query with validated output
+          return next();
+        }
+      });
+    };
+  };
+
   canAccessCouple = async (req: any, res: Response, next: any) => {
     const role = get(req, "user.role", "");
     if (role == "headCounsellor") {

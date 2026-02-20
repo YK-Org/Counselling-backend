@@ -6,6 +6,10 @@ import { CouplesDetails } from "../mongoose/models/CouplesDetails";
 import { Lessons } from "../mongoose/models/Lessons";
 import { User } from "../mongoose/models/Users";
 import { handleError, handleValidationError } from "../helpers/errorHandler";
+import {
+  DateRangeQueryDTO,
+  OptionalDateRangeQueryDTO,
+} from "../validationClasses/reports/dateRange";
 
 const router = express.Router();
 
@@ -182,30 +186,21 @@ const getAgeDistribution = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/reports/age", [], getAgeDistribution);
+router.get(
+  "/reports/age",
+  [MiddlewareService.queryValidation(OptionalDateRangeQueryDTO)],
+  getAgeDistribution
+);
 
 const getCompletedSessionsOverTime = async (
   request: Request,
   response: Response,
 ) => {
   try {
-    const { startDate, endDate } = request.query;
+    const { startDate, endDate } = request.query as { startDate: string; endDate: string };
 
-    if (!startDate || !endDate) {
-      return handleValidationError(
-        response,
-        "startDate and endDate are required"
-      );
-    }
-
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return response
-        .status(400)
-        .json({ message: "Invalid date format. Use ISO 8601 format" });
-    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
     const data = await Couples.aggregate([
       {
@@ -247,31 +242,22 @@ const getCompletedSessionsOverTime = async (
 
     return response.status(200).json(data);
   } catch (err: any) {
-    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
+    return handleError(response, err, "getCompletedSessionsOverTime", "Failed to fetch completed sessions over time");
   }
 };
 
-router.get("/reports/completed/sessions", [], getCompletedSessionsOverTime);
+router.get(
+  "/reports/completed/sessions",
+  [MiddlewareService.queryValidation(DateRangeQueryDTO)],
+  getCompletedSessionsOverTime
+);
 
 const getCouplesStatistics = async (request: Request, response: Response) => {
   try {
-    const { startDate, endDate } = request.query;
+    const { startDate, endDate } = request.query as { startDate: string; endDate: string };
 
-    if (!startDate || !endDate) {
-      return handleValidationError(
-        response,
-        "startDate and endDate are required"
-      );
-    }
-
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return response
-        .status(400)
-        .json({ message: "Invalid date format. Use ISO 8601 format" });
-    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
     // Get all couples within the date range
     const couples = await Couples.find({
@@ -326,7 +312,11 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/reports/couples/statistics", [], getCouplesStatistics);
+router.get(
+  "/reports/couples/statistics",
+  [MiddlewareService.queryValidation(DateRangeQueryDTO)],
+  getCouplesStatistics
+);
 
 const getCounsellorStatistics = async (
   request: Request,
@@ -547,6 +537,10 @@ const getCounsellorStatistics = async (
   }
 };
 
-router.get("/reports/counsellors/statistics", [], getCounsellorStatistics);
+router.get(
+  "/reports/counsellors/statistics",
+  [MiddlewareService.queryValidation(OptionalDateRangeQueryDTO)],
+  getCounsellorStatistics
+);
 
 export default router;
