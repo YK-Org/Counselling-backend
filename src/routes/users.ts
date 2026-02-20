@@ -8,25 +8,21 @@ import { omit } from "lodash";
 import multer from "multer";
 import MediaService from "../services/media";
 import { handleError, handleValidationError, handleNotFoundError } from "../helpers/errorHandler";
+import { FILE_UPLOAD_LIMITS } from "../constants/counsellor-status";
+import { AuthenticatedRequest } from "../types";
+import { uploadLimiter, passwordChangeLimiter } from "../middleware/rateLimiter";
 
 // Configure multer with validation
+const { PROFILE_PICTURE } = FILE_UPLOAD_LIMITS;
+
 const upload = multer({
   dest: "uploads/profile-pictures/",
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: PROFILE_PICTURE.MAX_SIZE_BYTES,
   },
   fileFilter: (_req, file, cb) => {
-    // Allowed image MIME types
-    const allowedMimeTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
-
-    // Check MIME type
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    // Check MIME type against allowed types
+    if (PROFILE_PICTURE.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(
@@ -93,16 +89,34 @@ router.get(
 const changePassword = async (request: Request, response: Response) => {
   try {
     const oldPassword = request.body.oldPassword;
-    const id = (request as any).user._id;
+    const password = request.body.password;
+    const id = (request as AuthenticatedRequest).user._id;
+
+    // Validate that new password is different from old password
+    if (password === oldPassword) {
+      return handleValidationError(
+        response,
+        "New password must be different from old password"
+      );
+    }
+
+    // Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return handleValidationError(
+        response,
+        "Password must be at least 8 characters with uppercase, lowercase, number, and special character"
+      );
+    }
+
     const getUser = await UserService.getUser(id);
     const checkPassword = await bcrypt.compare(
       oldPassword,
       getUser?.password || ""
     );
     if (!checkPassword) {
-      throw new Error("Password could not be changed");
+      return handleValidationError(response, "Current password is incorrect");
     }
-    const password = request.body.password;
     const encryptedUserPassword = await bcrypt.hash(password, 10);
 
     if (getUser) {
@@ -141,7 +155,10 @@ const changePassword = async (request: Request, response: Response) => {
 
 router.post(
   "/change/password",
-  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  [
+    passwordChangeLimiter,
+    MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
+  ],
   changePassword
 );
 
@@ -149,7 +166,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
   const file = request.file as Express.Multer.File;
 
   try {
-    const userId = (request as any).user._id;
+    const userId = (request as AuthenticatedRequest).user._id;
 
     if (!file) {
       return handleValidationError(response, "No file uploaded");
@@ -195,6 +212,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
 router.post(
   "/profile/picture",
   [
+    uploadLimiter,
     MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
     upload.single("profilePicture"),
     handleMulterError,
@@ -204,7 +222,7 @@ router.post(
 
 const getUserProfile = async (request: Request, response: Response) => {
   try {
-    const userId = (request as any).user._id;
+    const userId = (request as AuthenticatedRequest).user._id;
     const user = await UserService.getUser(userId);
 
     if (!user) {
@@ -236,7 +254,7 @@ router.get(
 
 const getProfilePicture = async (request: Request, response: Response) => {
   try {
-    const userId = (request as any).user._id;
+    const userId = (request as AuthenticatedRequest).user._id;
     const user = await UserService.getUser(userId);
 
     if (!user || !user.profilePicture) {

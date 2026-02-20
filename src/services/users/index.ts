@@ -21,7 +21,7 @@ class UserService {
     }
   }
 
-  async getUser(id: Types.ObjectId) {
+  async getUser(id: Types.ObjectId | string) {
     try {
       const response = await User.findById(id);
       return response;

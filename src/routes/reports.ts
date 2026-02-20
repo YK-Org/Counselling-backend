@@ -10,48 +10,82 @@ import {
   DateRangeQueryDTO,
   OptionalDateRangeQueryDTO,
 } from "../validationClasses/reports/dateRange";
+import { OptionalDateRangeWithPaginationDTO } from "../validationClasses/reports/paginatedReports";
+import { PaginationQueryDTO } from "../validationClasses/common/pagination";
+import { COUNSELLOR_STATUS_THRESHOLDS } from "../constants/counsellor-status";
+import { DateFilter } from "../types";
 
 const router = express.Router();
 
 const getCounsellorSessions = async (request: Request, response: Response) => {
   try {
-    const data = await Couples.aggregate([
-      {
-        $group: {
-          _id: "$counsellorId",
-          completedCount: {
-            $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
-          },
-          ongoingCount: {
-            $sum: { $cond: [{ $eq: ["$completed", false] }, 1, 0] },
+    const { page = 1, limit = 20 } = request.query as any;
+    const skip = (page - 1) * limit;
+
+    // Get total count and paginated data in parallel
+    const [data, totalResult] = await Promise.all([
+      Couples.aggregate([
+        {
+          $group: {
+            _id: "$counsellorId",
+            completedCount: {
+              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+            },
+            ongoingCount: {
+              $sum: { $cond: [{ $eq: ["$completed", false] }, 1, 0] },
+            },
           },
         },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "_id",
-          foreignField: "_id",
-          as: "counsellorInfo",
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          counsellorId: "$_id",
-          counsellorName: {
-            $concat: [
-              { $arrayElemAt: ["$counsellorInfo.firstName", 0] },
-              " ",
-              { $arrayElemAt: ["$counsellorInfo.lastName", 0] },
-            ],
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "counsellorInfo",
           },
-          completedCount: 1,
-          ongoingCount: 1,
         },
-      },
+        {
+          $project: {
+            _id: 0,
+            counsellorId: "$_id",
+            counsellorName: {
+              $concat: [
+                { $arrayElemAt: ["$counsellorInfo.firstName", 0] },
+                " ",
+                { $arrayElemAt: ["$counsellorInfo.lastName", 0] },
+              ],
+            },
+            completedCount: 1,
+            ongoingCount: 1,
+          },
+        },
+        { $skip: skip },
+        { $limit: limit },
+      ]),
+      Couples.aggregate([
+        {
+          $group: {
+            _id: "$counsellorId",
+          },
+        },
+        {
+          $count: "total",
+        },
+      ]),
     ]);
-    return response.status(200).json(data);
+
+    const total = totalResult[0]?.total || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    return response.status(200).json({
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
   } catch (err: any) {
     return handleError(
       response,
@@ -62,24 +96,74 @@ const getCounsellorSessions = async (request: Request, response: Response) => {
   }
 };
 
-router.get("/reports/counsellors/sessions", [], getCounsellorSessions);
+router.get(
+  "/reports/counsellors/sessions",
+  [MiddlewareService.queryValidation(PaginationQueryDTO)],
+  getCounsellorSessions
+);
+
+// Helper function to get age distribution by gender
+const getAgeDistributionByGender = async (
+  gender: "male" | "female",
+  dateFilter: DateFilter
+) => {
+  const matchCriteria = {
+    gender,
+    dateOfBirth: { $exists: true, $ne: null },
+    ...dateFilter,
+  };
+
+  return CouplesDetails.aggregate([
+    {
+      $match: matchCriteria,
+    },
+    {
+      $addFields: {
+        age: {
+          $subtract: [{ $year: "$createdAt" }, { $year: "$dateOfBirth" }],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          $switch: {
+            branches: [
+              {
+                case: {
+                  $and: [{ $lte: ["$age", 30] }, { $gte: ["$age", 20] }],
+                },
+                then: "20-30",
+              },
+              {
+                case: {
+                  $and: [{ $lte: ["$age", 40] }, { $gt: ["$age", 31] }],
+                },
+                then: "31-40",
+              },
+              {
+                case: {
+                  $and: [{ $lte: ["$age", 50] }, { $gt: ["$age", 41] }],
+                },
+                then: "41-50",
+              },
+            ],
+            default: "51+",
+          },
+        },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+};
 
 const getAgeDistribution = async (request: Request, response: Response) => {
   try {
     const { startDate, endDate } = request.query;
 
-    // Build base match criteria
-    const baseMatchMale: any = {
-      gender: "male",
-      dateOfBirth: { $exists: true, $ne: null },
-    };
+    // Build date filter if provided
+    let dateFilter: DateFilter = {};
 
-    const baseMatchFemale: any = {
-      gender: "female",
-      dateOfBirth: { $exists: true, $ne: null },
-    };
-
-    // Add date filtering if provided
     if (startDate && endDate) {
       const start = new Date(startDate as string);
       const end = new Date(endDate as string);
@@ -91,98 +175,23 @@ const getAgeDistribution = async (request: Request, response: Response) => {
         );
       }
 
-      baseMatchMale.createdAt = { $gte: start, $lte: end };
-      baseMatchFemale.createdAt = { $gte: start, $lte: end };
+      dateFilter.createdAt = { $gte: start, $lte: end };
     }
 
-    const maleData = await CouplesDetails.aggregate([
-      {
-        $match: baseMatchMale,
-      },
-      {
-        $addFields: {
-          age: {
-            $subtract: [{ $year: "$createdAt" }, { $year: "$dateOfBirth" }],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            $switch: {
-              branches: [
-                {
-                  case: {
-                    $and: [{ $lte: ["$age", 30] }, { $gte: ["$age", 20] }],
-                  },
-                  then: "20-30",
-                },
-                {
-                  case: {
-                    $and: [{ $lte: ["$age", 40] }, { $gt: ["$age", 31] }],
-                  },
-                  then: "31-40",
-                },
-                {
-                  case: {
-                    $and: [{ $lte: ["$age", 50] }, { $gt: ["$age", 41] }],
-                  },
-                  then: "41-50",
-                },
-              ],
-              default: "51+",
-            },
-          },
-          count: { $sum: 1 },
-        },
-      },
+    // Fetch both male and female data in parallel
+    const [maleData, femaleData] = await Promise.all([
+      getAgeDistributionByGender("male", dateFilter),
+      getAgeDistributionByGender("female", dateFilter),
     ]);
 
-    const femaleData = await CouplesDetails.aggregate([
-      {
-        $match: baseMatchFemale,
-      },
-      {
-        $addFields: {
-          age: {
-            $subtract: [{ $year: "$createdAt" }, { $year: "$dateOfBirth" }],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            $switch: {
-              branches: [
-                {
-                  case: {
-                    $and: [{ $lte: ["$age", 30] }, { $gte: ["$age", 20] }],
-                  },
-                  then: "20-30",
-                },
-                {
-                  case: {
-                    $and: [{ $lte: ["$age", 40] }, { $gt: ["$age", 31] }],
-                  },
-                  then: "31-40",
-                },
-                {
-                  case: {
-                    $and: [{ $lte: ["$age", 50] }, { $gt: ["$age", 41] }],
-                  },
-                  then: "41-50",
-                },
-              ],
-              default: "51+",
-            },
-          },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
     return response.status(200).json({ maleData, femaleData });
   } catch (err: any) {
-    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
+    return handleError(
+      response,
+      err,
+      "getAgeDistribution",
+      "Failed to fetch age distribution"
+    );
   }
 };
 
@@ -259,33 +268,69 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // Get all couples within the date range
-    const couples = await Couples.find({
-      createdAt: {
-        $gte: start,
-        $lte: end,
+    // Use aggregation pipeline for better performance
+    const stats = await Couples.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: start,
+            $lte: end,
+          },
+        },
       },
-    });
+      {
+        $facet: {
+          totalCouples: [{ $count: "count" }],
+          assignedCouples: [
+            { $match: { counsellorId: { $exists: true, $ne: null } } },
+            { $count: "count" },
+          ],
+          awaitingAssignment: [
+            {
+              $match: {
+                $or: [
+                  { counsellorId: { $exists: false } },
+                  { counsellorId: null },
+                ],
+              },
+            },
+            { $count: "count" },
+          ],
+          assignedNotStarted: [
+            {
+              $match: {
+                counsellorId: { $exists: true, $ne: null },
+                $expr: {
+                  $eq: [{ $size: { $ifNull: ["$lessonsCompleted", []] } }, 0],
+                },
+              },
+            },
+            { $count: "count" },
+          ],
+          lessonStats: [
+            {
+              $project: {
+                lessonsCount: { $size: { $ifNull: ["$lessonsCompleted", []] } },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                totalCompletedLessons: { $sum: "$lessonsCount" },
+              },
+            },
+          ],
+        },
+      },
+    ]);
 
-    // Calculate statistics
-    const totalCouples = couples.length;
-    const assignedCouples = couples.filter(
-      (couple) => couple.counsellorId,
-    ).length;
-    const awaitingAssignment = couples.filter(
-      (couple) => !couple.counsellorId,
-    ).length;
-    const assignedNotStarted = couples.filter(
-      (couple) =>
-        couple.counsellorId &&
-        (!couple.lessonsCompleted || couple.lessonsCompleted.length === 0),
-    ).length;
-
-    // Calculate total completed lessons across all couples
-    const totalCompletedLessons = couples.reduce(
-      (sum, couple) => sum + (couple.lessonsCompleted?.length || 0),
-      0,
-    );
+    // Extract counts from facet results
+    const totalCouples = stats[0].totalCouples[0]?.count || 0;
+    const assignedCouples = stats[0].assignedCouples[0]?.count || 0;
+    const awaitingAssignment = stats[0].awaitingAssignment[0]?.count || 0;
+    const assignedNotStarted = stats[0].assignedNotStarted[0]?.count || 0;
+    const totalCompletedLessons =
+      stats[0].lessonStats[0]?.totalCompletedLessons || 0;
 
     // Calculate average lesson progress
     const avgLessonProgress =
@@ -299,7 +344,7 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
       assignedCouples,
       awaitingAssignment,
       assignedNotStarted,
-      avgLessonProgress: Math.round(avgLessonProgress * 100) / 100, // Round to 2 decimal places
+      avgLessonProgress: Math.round(avgLessonProgress * 100) / 100,
       completedLessons: totalCompletedLessons,
       totalAvailableLessons: totalLessons,
       dateRange: {
@@ -308,7 +353,12 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
       },
     });
   } catch (err: any) {
-    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
+    return handleError(
+      response,
+      err,
+      "getCouplesStatistics",
+      "Failed to fetch couples statistics"
+    );
   }
 };
 
@@ -323,10 +373,11 @@ const getCounsellorStatistics = async (
   response: Response,
 ) => {
   try {
-    const { startDate, endDate } = request.query;
+    const { startDate, endDate, page = 1, limit = 20 } = request.query as any;
+    const skip = (page - 1) * limit;
 
     // Build date filter if provided
-    let dateFilter: any = {};
+    let dateFilter: DateFilter = {};
     if (startDate && endDate) {
       const start = new Date(startDate as string);
       const end = new Date(endDate as string);
@@ -346,14 +397,12 @@ const getCounsellorStatistics = async (
       };
     }
 
-    // Get total counsellors
-    const totalCounsellors = await User.countDocuments({ role: "counsellor" });
-
-    // Get available counsellors
-    const availableCounsellors = await User.countDocuments({
-      role: "counsellor",
-      availability: true,
-    });
+    // Get all counsellors (fetch once and reuse)
+    const allCounsellorsData = await User.find({ role: "counsellor" });
+    const totalCounsellors = allCounsellorsData.length;
+    const availableCounsellors = allCounsellorsData.filter(
+      (c) => c.availability === true
+    ).length;
 
     // Get all couples (with date filter if provided)
     const allCouples = await Couples.find(dateFilter);
@@ -364,54 +413,70 @@ const getCounsellorStatistics = async (
     const overallCompletionRate =
       totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
 
-    // Get counsellor workload data
-    const counsellorWorkload = await Couples.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: "$counsellorId",
-          completedCount: {
-            $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
-          },
-          ongoingCount: {
-            $sum: { $cond: [{ $eq: ["$completed", false] }, 1, 0] },
-          },
-          totalSessions: { $sum: 1 },
-        },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "_id",
-          foreignField: "_id",
-          as: "counsellorInfo",
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          counsellorId: "$_id",
-          counsellorName: {
-            $concat: [
-              { $arrayElemAt: ["$counsellorInfo.firstName", 0] },
-              " ",
-              { $arrayElemAt: ["$counsellorInfo.lastName", 0] },
-            ],
-          },
-          completedSessions: "$completedCount",
-          ongoingSessions: "$ongoingCount",
-          totalSessions: 1,
-          completionRate: {
-            $multiply: [
-              { $divide: ["$completedCount", "$totalSessions"] },
-              100,
-            ],
+    // Get counsellor workload data with pagination
+    const [counsellorWorkload, workloadCountResult] = await Promise.all([
+      Couples.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: "$counsellorId",
+            completedCount: {
+              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+            },
+            ongoingCount: {
+              $sum: { $cond: [{ $eq: ["$completed", false] }, 1, 0] },
+            },
+            totalSessions: { $sum: 1 },
           },
         },
-      },
-      {
-        $sort: { completionRate: -1 },
-      },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "counsellorInfo",
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            counsellorId: "$_id",
+            counsellorName: {
+              $concat: [
+                { $arrayElemAt: ["$counsellorInfo.firstName", 0] },
+                " ",
+                { $arrayElemAt: ["$counsellorInfo.lastName", 0] },
+              ],
+            },
+            completedSessions: "$completedCount",
+            ongoingSessions: "$ongoingCount",
+            totalSessions: 1,
+            completionRate: {
+              $multiply: [
+                { $divide: ["$completedCount", "$totalSessions"] },
+                100,
+              ],
+            },
+          },
+        },
+        {
+          $sort: { completionRate: -1 },
+        },
+        { $skip: skip },
+        { $limit: limit },
+      ]),
+      // Get total count for pagination
+      Couples.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: "$counsellorId",
+          },
+        },
+        {
+          $count: "total",
+        },
+      ]),
     ]);
 
     // Calculate average completion rate
@@ -440,7 +505,6 @@ const getCounsellorStatistics = async (
       );
 
     // Count counsellors with no active sessions
-    const allCounsellorsData = await User.find({ role: "counsellor" });
     const counsellorsWithSessions = new Set(
       counsellorWorkload.map((c) => c.counsellorId?.toString()),
     );
@@ -448,12 +512,14 @@ const getCounsellorStatistics = async (
       (c) => !counsellorsWithSessions.has(c._id.toString()),
     ).length;
 
-    // Build counsellor progress table with status - include ALL counsellors
+    // Build counsellor progress table with status - include ALL counsellors (paginated)
     const workloadMap = new Map(
       counsellorWorkload.map((c) => [c.counsellorId?.toString(), c]),
     );
 
-    const counsellorProgressTable = allCounsellorsData.map((counsellor) => {
+    // Apply pagination to counsellor progress table
+    const paginatedCounsellors = allCounsellorsData.slice(skip, skip + limit);
+    const counsellorProgressTable = paginatedCounsellors.map((counsellor) => {
       const workloadData = workloadMap.get(counsellor._id.toString());
       const counsellorName = `${counsellor.firstName} ${counsellor.lastName}`;
 
@@ -470,11 +536,16 @@ const getCounsellorStatistics = async (
         completionRate = workloadData.completionRate;
 
         // Determine status based on completion rate and workload
-        if (completionRate < 30 && total > 0) {
+        const { NEEDS_SUPPORT, EXCELLENT } = COUNSELLOR_STATUS_THRESHOLDS;
+
+        if (completionRate < NEEDS_SUPPORT.MAX_COMPLETION_RATE && total > 0) {
           status = "Needs support";
-        } else if (total > 5 && completionRate < 50) {
+        } else if (
+          total > NEEDS_SUPPORT.HIGH_WORKLOAD_THRESHOLD &&
+          completionRate < NEEDS_SUPPORT.HIGH_WORKLOAD_MAX_RATE
+        ) {
           status = "Needs support";
-        } else if (completionRate >= 70) {
+        } else if (completionRate >= EXCELLENT.MIN_COMPLETION_RATE) {
           status = "Excellent";
         } else if (total > 0) {
           status = "Good";
@@ -490,6 +561,10 @@ const getCounsellorStatistics = async (
         status,
       };
     });
+
+    // Calculate pagination metadata
+    const workloadTotal = workloadCountResult[0]?.total || 0;
+    const totalPages = Math.ceil(Math.max(workloadTotal, totalCounsellors) / limit);
 
     return response.status(200).json({
       totalCounsellors,
@@ -531,6 +606,12 @@ const getCounsellorStatistics = async (
         noActiveSessions,
       },
       counsellorProgressTable,
+      pagination: {
+        page,
+        limit,
+        total: Math.max(workloadTotal, totalCounsellors),
+        totalPages,
+      },
     });
   } catch (err: any) {
     return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
@@ -539,7 +620,7 @@ const getCounsellorStatistics = async (
 
 router.get(
   "/reports/counsellors/statistics",
-  [MiddlewareService.queryValidation(OptionalDateRangeQueryDTO)],
+  [MiddlewareService.queryValidation(OptionalDateRangeWithPaginationDTO)],
   getCounsellorStatistics
 );
 
