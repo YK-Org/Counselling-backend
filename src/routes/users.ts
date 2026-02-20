@@ -8,8 +8,57 @@ import { omit } from "lodash";
 import multer from "multer";
 import MediaService from "../services/media";
 
-const upload = multer({ dest: "uploads/profile-pictures/" });
+// Configure multer with validation
+const upload = multer({
+  dest: "uploads/profile-pictures/",
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+  fileFilter: (_req, file, cb) => {
+    // Allowed image MIME types
+    const allowedMimeTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+
+    // Check MIME type
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          "Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed."
+        ) as any,
+        false
+      );
+    }
+  },
+});
+
 const router = express.Router();
+
+// Middleware to handle multer errors
+const handleMulterError = (err: any, _req: Request, res: Response, next: any) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        message: "File size too large. Maximum size is 5MB.",
+      });
+    }
+    return res.status(400).json({
+      message: `Upload error: ${err.message}`,
+    });
+  } else if (err) {
+    // Handle custom errors from fileFilter
+    return res.status(400).json({
+      message: err.message,
+    });
+  }
+  next();
+};
 
 const dashboardInit = async (request: Request, response: Response) => {
   try {
@@ -86,9 +135,10 @@ router.post(
 );
 
 const uploadProfilePicture = async (request: Request, response: Response) => {
+  const file = request.file as Express.Multer.File;
+
   try {
     const userId = (request as any).user._id;
-    const file = request.file as Express.Multer.File;
 
     if (!file) {
       return response.status(400).json({ message: "No file uploaded" });
@@ -116,7 +166,18 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
       fileName: uploadedFiles[0].name,
     });
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    // Clean up temporary file on error
+    if (file?.path) {
+      const fs = require("fs");
+      fs.unlink(file.path, (unlinkErr: any) => {
+        if (unlinkErr) console.error("Error deleting temp file:", unlinkErr);
+      });
+    }
+
+    console.error("Error uploading profile picture:", err);
+    return response
+      .status(500)
+      .json({ message: "Failed to upload profile picture" });
   }
 };
 
@@ -125,6 +186,7 @@ router.post(
   [
     MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
     upload.single("profilePicture"),
+    handleMulterError,
   ],
   uploadProfilePicture
 );
