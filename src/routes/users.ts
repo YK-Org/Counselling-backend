@@ -7,6 +7,7 @@ import AuthService from "../services/auth";
 import { omit } from "lodash";
 import multer from "multer";
 import MediaService from "../services/media";
+import { handleError, handleValidationError, handleNotFoundError } from "../helpers/errorHandler";
 
 // Configure multer with validation
 const upload = multer({
@@ -60,7 +61,7 @@ const handleMulterError = (err: any, _req: Request, res: Response, next: any) =>
   next();
 };
 
-const dashboardInit = async (request: Request, response: Response) => {
+const dashboardInit = async (_request: Request, response: Response) => {
   try {
     const unassignedCouplesCount =
       await CouplesService.countUnassignedCouples();
@@ -74,7 +75,12 @@ const dashboardInit = async (request: Request, response: Response) => {
       countCompletedSessions,
     });
   } catch (err) {
-    console.log(err);
+    return handleError(
+      response,
+      err,
+      "dashboardInit",
+      "Failed to fetch dashboard data"
+    );
   }
 };
 
@@ -124,7 +130,12 @@ const changePassword = async (request: Request, response: Response) => {
       throw new Error("Error changing password");
     }
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(
+      response,
+      err,
+      "changePassword",
+      "Failed to change password"
+    );
   }
 };
 
@@ -141,7 +152,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
     const userId = (request as any).user._id;
 
     if (!file) {
-      return response.status(400).json({ message: "No file uploaded" });
+      return handleValidationError(response, "No file uploaded");
     }
 
     // Upload to Google Drive
@@ -197,7 +208,7 @@ const getUserProfile = async (request: Request, response: Response) => {
     const user = await UserService.getUser(userId);
 
     if (!user) {
-      return response.status(404).json({ message: "User not found" });
+      return handleNotFoundError(response, "User not found");
     }
 
     const userData = omit(user.toObject(), [
@@ -208,7 +219,12 @@ const getUserProfile = async (request: Request, response: Response) => {
 
     return response.status(200).json(userData);
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(
+      response,
+      err,
+      "getUserProfile",
+      "Failed to fetch user profile"
+    );
   }
 };
 
@@ -224,9 +240,7 @@ const getProfilePicture = async (request: Request, response: Response) => {
     const user = await UserService.getUser(userId);
 
     if (!user || !user.profilePicture) {
-      return response
-        .status(404)
-        .json({ message: "Profile picture not found" });
+      return handleNotFoundError(response, "Profile picture not found");
     }
 
     // Get file from Google Drive
@@ -244,7 +258,12 @@ const getProfilePicture = async (request: Request, response: Response) => {
       });
     });
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(
+      response,
+      err,
+      "getProfilePicture",
+      "Failed to retrieve profile picture"
+    );
   }
 };
 

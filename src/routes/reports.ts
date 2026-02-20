@@ -5,6 +5,7 @@ import { Couples } from "../mongoose/models/Couples";
 import { CouplesDetails } from "../mongoose/models/CouplesDetails";
 import { Lessons } from "../mongoose/models/Lessons";
 import { User } from "../mongoose/models/Users";
+import { handleError, handleValidationError } from "../helpers/errorHandler";
 
 const router = express.Router();
 
@@ -48,7 +49,12 @@ const getCounsellorSessions = async (request: Request, response: Response) => {
     ]);
     return response.status(200).json(data);
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(
+      response,
+      err,
+      "getCounsellorSessions",
+      "Failed to fetch counsellor sessions data"
+    );
   }
 };
 
@@ -75,9 +81,10 @@ const getAgeDistribution = async (request: Request, response: Response) => {
       const end = new Date(endDate as string);
 
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        return response
-          .status(400)
-          .json({ message: "Invalid date format. Use ISO 8601 format" });
+        return handleValidationError(
+          response,
+          "Invalid date format. Use ISO 8601 format"
+        );
       }
 
       baseMatchMale.createdAt = { $gte: start, $lte: end };
@@ -171,7 +178,7 @@ const getAgeDistribution = async (request: Request, response: Response) => {
     ]);
     return response.status(200).json({ maleData, femaleData });
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
   }
 };
 
@@ -185,9 +192,10 @@ const getCompletedSessionsOverTime = async (
     const { startDate, endDate } = request.query;
 
     if (!startDate || !endDate) {
-      return response
-        .status(400)
-        .json({ message: "startDate and endDate are required" });
+      return handleValidationError(
+        response,
+        "startDate and endDate are required"
+      );
     }
 
     const start = new Date(startDate as string);
@@ -239,7 +247,7 @@ const getCompletedSessionsOverTime = async (
 
     return response.status(200).json(data);
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
   }
 };
 
@@ -250,9 +258,10 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
     const { startDate, endDate } = request.query;
 
     if (!startDate || !endDate) {
-      return response
-        .status(400)
-        .json({ message: "startDate and endDate are required" });
+      return handleValidationError(
+        response,
+        "startDate and endDate are required"
+      );
     }
 
     const start = new Date(startDate as string);
@@ -313,7 +322,7 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
       },
     });
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
   }
 };
 
@@ -333,9 +342,10 @@ const getCounsellorStatistics = async (
       const end = new Date(endDate as string);
 
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        return response
-          .status(400)
-          .json({ message: "Invalid date format. Use ISO 8601 format" });
+        return handleValidationError(
+          response,
+          "Invalid date format. Use ISO 8601 format"
+        );
       }
 
       dateFilter = {
@@ -533,7 +543,7 @@ const getCounsellorStatistics = async (
       counsellorProgressTable,
     });
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(response, err, "reportEndpoint", "Failed to fetch report data");
   }
 };
 
