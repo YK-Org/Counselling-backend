@@ -54,33 +54,6 @@ const getCounsellorSessions = async (request: Request, response: Response) => {
 
 router.get("/reports/counsellors/sessions", [], getCounsellorSessions);
 
-const getCompletedSessions = async (request: Request, response: Response) => {
-  try {
-    const data = await Couples.aggregate([
-      {
-        $match: { completed: true },
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$updatedAt" },
-            month: { $month: "$updatedAt" },
-          },
-          completedCount: { $sum: 1 },
-        },
-      },
-      {
-        $sort: { _id: 1 },
-      },
-    ]);
-    return response.status(200).json(data);
-  } catch (err: any) {
-    return response.status(500).json({ message: err.message });
-  }
-};
-
-router.get("/reports/completed/sessions", [], getCompletedSessions);
-
 const getAgeDistribution = async (request: Request, response: Response) => {
   try {
     const { startDate, endDate } = request.query;
@@ -302,21 +275,21 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
     // Calculate statistics
     const totalCouples = couples.length;
     const assignedCouples = couples.filter(
-      (couple) => couple.counsellorId
+      (couple) => couple.counsellorId,
     ).length;
     const awaitingAssignment = couples.filter(
-      (couple) => !couple.counsellorId
+      (couple) => !couple.counsellorId,
     ).length;
     const assignedNotStarted = couples.filter(
       (couple) =>
         couple.counsellorId &&
-        (!couple.lessonsCompleted || couple.lessonsCompleted.length === 0)
+        (!couple.lessonsCompleted || couple.lessonsCompleted.length === 0),
     ).length;
 
     // Calculate total completed lessons across all couples
     const totalCompletedLessons = couples.reduce(
       (sum, couple) => sum + (couple.lessonsCompleted?.length || 0),
-      0
+      0,
     );
 
     // Calculate average lesson progress
@@ -348,7 +321,7 @@ router.get("/reports/couples/statistics", [], getCouplesStatistics);
 
 const getCounsellorStatistics = async (
   request: Request,
-  response: Response
+  response: Response,
 ) => {
   try {
     const { startDate, endDate } = request.query;
@@ -455,7 +428,7 @@ const getCounsellorStatistics = async (
     // Get counsellor with highest workload
     const highestWorkload = counsellorWorkload.reduce(
       (max, c) => (c.totalSessions > (max?.totalSessions || 0) ? c : max),
-      counsellorWorkload[0] || null
+      counsellorWorkload[0] || null,
     );
 
     // Get counsellor with lowest completion rate (excluding those with 0 sessions)
@@ -463,21 +436,21 @@ const getCounsellorStatistics = async (
       .filter((c) => c.totalSessions > 0)
       .reduce(
         (min, c) => (c.completionRate < (min?.completionRate || 100) ? c : min),
-        counsellorWorkload[0] || null
+        counsellorWorkload[0] || null,
       );
 
     // Count counsellors with no active sessions
     const allCounsellorsData = await User.find({ role: "counsellor" });
     const counsellorsWithSessions = new Set(
-      counsellorWorkload.map((c) => c.counsellorId?.toString())
+      counsellorWorkload.map((c) => c.counsellorId?.toString()),
     );
     const noActiveSessions = allCounsellorsData.filter(
-      (c) => !counsellorsWithSessions.has(c._id.toString())
+      (c) => !counsellorsWithSessions.has(c._id.toString()),
     ).length;
 
     // Build counsellor progress table with status - include ALL counsellors
     const workloadMap = new Map(
-      counsellorWorkload.map((c) => [c.counsellorId?.toString(), c])
+      counsellorWorkload.map((c) => [c.counsellorId?.toString(), c]),
     );
 
     const counsellorProgressTable = allCounsellorsData.map((counsellor) => {
