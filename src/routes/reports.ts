@@ -19,7 +19,10 @@ const router = express.Router();
 
 const getCounsellorSessions = async (request: Request, response: Response) => {
   try {
-    const { page = 1, limit = 20 } = request.query as any;
+    const { page = 1, limit = 20 } = request.query as {
+      page?: number;
+      limit?: number;
+    };
     const skip = (page - 1) * limit;
 
     // Get total count and paginated data in parallel
@@ -373,14 +376,19 @@ const getCounsellorStatistics = async (
   response: Response,
 ) => {
   try {
-    const { startDate, endDate, page = 1, limit = 20 } = request.query as any;
+    const { startDate, endDate, page = 1, limit = 20 } = request.query as {
+      page?: number;
+      limit?: number;
+      startDate?: string;
+      endDate?: string;
+    };
     const skip = (page - 1) * limit;
 
     // Build date filter if provided
     let dateFilter: DateFilter = {};
     if (startDate && endDate) {
-      const start = new Date(startDate as string);
-      const end = new Date(endDate as string);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
 
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return handleValidationError(
@@ -413,108 +421,98 @@ const getCounsellorStatistics = async (
     const overallCompletionRate =
       totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
 
-    // Get counsellor workload data with pagination
-    const [counsellorWorkload, workloadCountResult] = await Promise.all([
-      Couples.aggregate([
-        { $match: dateFilter },
-        {
-          $group: {
-            _id: "$counsellorId",
-            completedCount: {
-              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
-            },
-            ongoingCount: {
-              $sum: { $cond: [{ $eq: ["$completed", false] }, 1, 0] },
-            },
-            totalSessions: { $sum: 1 },
+    // Get FULL counsellor workload data (for statistics - NO pagination)
+    const counsellorWorkloadFull = await Couples.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: "$counsellorId",
+          completedCount: {
+            $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+          },
+          ongoingCount: {
+            $sum: { $cond: [{ $eq: ["$completed", false] }, 1, 0] },
+          },
+          totalSessions: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "counsellorInfo",
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          counsellorId: "$_id",
+          counsellorName: {
+            $concat: [
+              { $arrayElemAt: ["$counsellorInfo.firstName", 0] },
+              " ",
+              { $arrayElemAt: ["$counsellorInfo.lastName", 0] },
+            ],
+          },
+          completedSessions: "$completedCount",
+          ongoingSessions: "$ongoingCount",
+          totalSessions: 1,
+          completionRate: {
+            $multiply: [
+              { $divide: ["$completedCount", "$totalSessions"] },
+              100,
+            ],
           },
         },
-        {
-          $lookup: {
-            from: "users",
-            localField: "_id",
-            foreignField: "_id",
-            as: "counsellorInfo",
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            counsellorId: "$_id",
-            counsellorName: {
-              $concat: [
-                { $arrayElemAt: ["$counsellorInfo.firstName", 0] },
-                " ",
-                { $arrayElemAt: ["$counsellorInfo.lastName", 0] },
-              ],
-            },
-            completedSessions: "$completedCount",
-            ongoingSessions: "$ongoingCount",
-            totalSessions: 1,
-            completionRate: {
-              $multiply: [
-                { $divide: ["$completedCount", "$totalSessions"] },
-                100,
-              ],
-            },
-          },
-        },
-        {
-          $sort: { completionRate: -1 },
-        },
-        { $skip: skip },
-        { $limit: limit },
-      ]),
-      // Get total count for pagination
-      Couples.aggregate([
-        { $match: dateFilter },
-        {
-          $group: {
-            _id: "$counsellorId",
-          },
-        },
-        {
-          $count: "total",
-        },
-      ]),
+      },
+      {
+        $sort: { completionRate: -1 },
+      },
     ]);
 
-    // Calculate average completion rate
+    // Calculate statistics from FULL dataset
     const avgCompletionRate =
-      counsellorWorkload.length > 0
-        ? counsellorWorkload.reduce((sum, c) => sum + c.completionRate, 0) /
-          counsellorWorkload.length
+      counsellorWorkloadFull.length > 0
+        ? counsellorWorkloadFull.reduce((sum, c) => sum + c.completionRate, 0) /
+          counsellorWorkloadFull.length
         : 0;
 
-    // Get top performer
+    // Get top performer from FULL dataset
     const topPerformer =
-      counsellorWorkload.length > 0 ? counsellorWorkload[0] : null;
+      counsellorWorkloadFull.length > 0 ? counsellorWorkloadFull[0] : null;
 
-    // Get counsellor with highest workload
-    const highestWorkload = counsellorWorkload.reduce(
+    // Get counsellor with highest workload from FULL dataset
+    const highestWorkload = counsellorWorkloadFull.reduce(
       (max, c) => (c.totalSessions > (max?.totalSessions || 0) ? c : max),
-      counsellorWorkload[0] || null,
+      counsellorWorkloadFull[0] || null,
     );
 
-    // Get counsellor with lowest completion rate (excluding those with 0 sessions)
-    const lowestCompletionRate = counsellorWorkload
+    // Get counsellor with lowest completion rate from FULL dataset (excluding those with 0 sessions)
+    const lowestCompletionRate = counsellorWorkloadFull
       .filter((c) => c.totalSessions > 0)
       .reduce(
         (min, c) => (c.completionRate < (min?.completionRate || 100) ? c : min),
-        counsellorWorkload[0] || null,
+        counsellorWorkloadFull[0] || null,
       );
 
     // Count counsellors with no active sessions
     const counsellorsWithSessions = new Set(
-      counsellorWorkload.map((c) => c.counsellorId?.toString()),
+      counsellorWorkloadFull.map((c) => c.counsellorId?.toString()),
     );
     const noActiveSessions = allCounsellorsData.filter(
       (c) => !counsellorsWithSessions.has(c._id.toString()),
     ).length;
 
-    // Build counsellor progress table with status - include ALL counsellors (paginated)
+    // Get PAGINATED workload for display
+    const counsellorWorkloadPaginated = counsellorWorkloadFull.slice(
+      skip,
+      skip + limit
+    );
+
+    // Build workload map from FULL dataset
     const workloadMap = new Map(
-      counsellorWorkload.map((c) => [c.counsellorId?.toString(), c]),
+      counsellorWorkloadFull.map((c) => [c.counsellorId?.toString(), c]),
     );
 
     // Apply pagination to counsellor progress table
@@ -563,8 +561,7 @@ const getCounsellorStatistics = async (
     });
 
     // Calculate pagination metadata
-    const workloadTotal = workloadCountResult[0]?.total || 0;
-    const totalPages = Math.ceil(Math.max(workloadTotal, totalCounsellors) / limit);
+    const totalPages = Math.ceil(totalCounsellors / limit);
 
     return response.status(200).json({
       totalCounsellors,
@@ -579,7 +576,7 @@ const getCounsellorStatistics = async (
               Math.round(topPerformer.completionRate * 100) / 100 + "%",
           }
         : null,
-      counsellorWorkload: counsellorWorkload.map((c) => ({
+      counsellorWorkload: counsellorWorkloadPaginated.map((c) => ({
         ...c,
         completionRate: Math.round(c.completionRate * 100) / 100 + "%",
       })),
@@ -609,7 +606,7 @@ const getCounsellorStatistics = async (
       pagination: {
         page,
         limit,
-        total: Math.max(workloadTotal, totalCounsellors),
+        total: totalCounsellors,
         totalPages,
       },
     });
