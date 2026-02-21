@@ -412,10 +412,22 @@ const getCounsellorStatistics = async (
       (c) => c.availability === true
     ).length;
 
-    // Get all couples (with date filter if provided)
-    const allCouples = await Couples.find(dateFilter);
-    const totalSessions = allCouples.length;
-    const completedSessions = allCouples.filter((c) => c.completed).length;
+    // Get session statistics using aggregation (optimized - no memory loading)
+    const [sessionStats] = await Couples.aggregate([
+      { $match: dateFilter },
+      {
+        $facet: {
+          totalSessions: [{ $count: "count" }],
+          completedSessions: [
+            { $match: { completed: true } },
+            { $count: "count" },
+          ],
+        },
+      },
+    ]);
+
+    const totalSessions = sessionStats.totalSessions[0]?.count || 0;
+    const completedSessions = sessionStats.completedSessions[0]?.count || 0;
 
     // Calculate overall completion rate
     const overallCompletionRate =
