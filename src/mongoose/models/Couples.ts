@@ -60,4 +60,11 @@ CouplesSchema.virtual("lessons", {
   foreignField: "_id",
 });
 
+// Add indexes for performance
+CouplesSchema.index({ counsellorId: 1 });
+CouplesSchema.index({ completed: 1 });
+CouplesSchema.index({ createdAt: -1 });
+CouplesSchema.index({ updatedAt: -1 });
+CouplesSchema.index({ counsellorId: 1, completed: 1 }); // Compound index
+
 export const Couples = mongoose.model<ICouples>("Couples", CouplesSchema);

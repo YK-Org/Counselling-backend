@@ -53,4 +53,9 @@ UserSchema.virtual("couples", {
   foreignField: "counsellorId",
 });
 
+// Add indexes for performance
+UserSchema.index({ role: 1 });
+UserSchema.index({ role: 1, availability: 1 }); // Compound index for counsellor queries
+UserSchema.index({ email: 1 }); // Already unique, but explicit index
+
 export const User = mongoose.model<IUser>("User", UserSchema);
