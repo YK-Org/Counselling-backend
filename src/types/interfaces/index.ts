@@ -1,4 +1,4 @@
-import { IUser } from "../../mongoose/models/Users";
+import { IUser } from "../models/Users";
 
 export interface IRequestUser {}
 

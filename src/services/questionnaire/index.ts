@@ -1,20 +1,28 @@
-import { Questionnaire } from "../../mongoose/models/Questionnaire";
+import prisma from "../../prisma/client";
 import CouplesDetailsService from "../couplesDetails";
 
 class QuestionnaireService {
   async saveResponse(
     contact: string,
-    response: any[],
+    response: { question: string; answer: string }[],
     type: "pre-test" | "post-test"
   ) {
     try {
-      const data = await CouplesDetailsService.findPartner(contact, ["couple"]);
-      console.log("tghu", data);
-      const result = await Questionnaire.create({
-        partnerId: data?._id,
-        coupleId: data?.couple?._id,
-        response,
-        type,
+      const partner: any = await CouplesDetailsService.findPartner(contact, [
+        "couple",
+      ]);
+      const result = await prisma.questionnaire.create({
+        data: {
+          type,
+          partnerId: partner?.id ?? null,
+          coupleId: partner?.couple?.id ?? null,
+          responses: {
+            create: (response || []).map((r) => ({
+              question: r.question,
+              answer: r.answer,
+            })),
+          },
+        },
       });
       return result;
     } catch (e: any) {
@@ -27,11 +35,18 @@ class QuestionnaireService {
     type: "pre-test" | "post-test"
   ) {
     try {
-      const result = await Questionnaire.find({
-        coupleId,
-        type,
+      const result = await prisma.questionnaire.findMany({
+        where: { coupleId, type },
+        include: { responses: true },
       });
-      return result;
+      // Reconstruct the legacy `response` array shape.
+      return result.map((q) => ({
+        ...q,
+        response: q.responses.map((r) => ({
+          question: r.question,
+          answer: r.answer,
+        })),
+      }));
     } catch (e: any) {
       throw new Error(e.message);
     }

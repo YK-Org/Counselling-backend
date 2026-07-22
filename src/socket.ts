@@ -28,7 +28,7 @@ export function initialize(server: any) {
     if (body.user && body.user.role === "headCounsellor") {
       socket.join(`headcounsellor`);
     } else {
-      socket.join(`counsellor-${body.user._id}`);
+      socket.join(`counsellor-${body.user.id}`);
     }
   });
 }

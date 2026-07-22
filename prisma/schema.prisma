@@ -1,0 +1,202 @@
+// Prisma schema — SKETCH translating the current Mongoose models to Postgres.
+//
+// Design notes:
+// - Deeply nested personal-history sub-documents (education, profession,
+//   parents, religion, siblings, `partner`, `otherInfo`) are genuinely
+//   document-shaped and almost never filtered by inner field, so they stay as
+//   `Json` (Postgres jsonb). The fields you DO query/report on (gender,
+//   dateOfBirth, name, phoneNumber, timestamps) are promoted to real columns.
+// - Mongo ObjectIds become cuid() string PKs. Switch to Int @id @default(autoincrement())
+//   if you prefer.
+// - `lessonsCompleted` (embedded array on Couple) becomes the CoupleLessonCompleted
+//   join table, so "completed lessons" reporting is a plain JOIN/COUNT.
+// - Google Drive upload refs ({ id, name }) are stored as Json.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  headCounsellor
+  counsellor
+}
+
+enum UserStatus {
+  active
+  banned
+  awaitingConfirmation
+}
+
+enum Gender {
+  male
+  female
+}
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  firstName      String
+  lastName       String
+  password       String
+  phoneNumber    String?
+  role           UserRole
+  status         UserStatus @default(awaitingConfirmation)
+  availability   Boolean    @default(true)
+  tokenIssuedAt  Int?
+  profilePicture String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // A counsellor is assigned to many couples
+  couples Couple[] @relation("CounsellorCouples")
+
+  @@index([role])
+  @@index([role, availability])
+}
+
+model Couple {
+  id                 String   @id @default(cuid())
+  completed          Boolean  @default(false)
+  counsellorAccepted String?
+  // Couple "letter" file reference ({ id, name })
+  letterFileId       String?
+  letterFileName     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  counsellorId String?
+  counsellor   User?   @relation("CounsellorCouples", fields: [counsellorId], references: [id])
+
+  // partners[] on the Mongo model -> one couple has many partner records
+  partners        Partner[]
+  lessonsCompleted CoupleLessonCompleted[]
+  assignments     Assignment[]
+  questionnaires  Questionnaire[]
+
+  @@index([counsellorId])
+  @@index([completed])
+  @@index([counsellorId, completed])
+  @@index([createdAt])
+  @@index([updatedAt])
+}
+
+// Was: CouplesDetails
+model Partner {
+  id          String    @id @default(cuid())
+  name        String
+  phoneNumber String?
+  dateOfBirth DateTime?
+  gender      Gender?
+  hometown    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Document-shaped history kept as jsonb (rarely queried by inner field)
+  education           Json?
+  profession          Json?
+  parents             Json?
+  partner             Json?
+  religion            Json?
+  siblings            Json?
+  otherInfo           Json?
+  churchAfterMarriage String?
+  orderOfBirth        String?
+
+  coupleId String?
+  couple   Couple? @relation(fields: [coupleId], references: [id])
+
+  questionnaires Questionnaire[]
+
+  @@index([coupleId])
+  @@index([gender])
+  @@index([phoneNumber])
+}
+
+model Lesson {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completedBy CoupleLessonCompleted[]
+  assignments Assignment[]
+}
+
+// Was: the embedded lessonsCompleted[] array on Couple
+model CoupleLessonCompleted {
+  id            String   @id @default(cuid())
+  coupleId      String
+  lessonId      String
+  dateCompleted DateTime @default(now())
+
+  couple Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([coupleId, lessonId])
+  @@index([coupleId])
+}
+
+model Assignment {
+  id        String   @id @default(cuid())
+  uploads   Json?    // [{ id, name }]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  couplesId String
+  couple    Couple @relation(fields: [couplesId], references: [id], onDelete: Cascade)
+  lessonId  String
+  lesson    Lesson @relation(fields: [lessonId], references: [id])
+
+  @@index([couplesId])
+}
+
+model Questionnaire {
+  id        String   @id @default(cuid())
+  type      String // "pre-test" | "post-test"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partnerId String?
+  partner   Partner? @relation(fields: [partnerId], references: [id])
+  coupleId  String?
+  couple    Couple?  @relation(fields: [coupleId], references: [id])
+
+  responses QuestionnaireResponse[]
+
+  @@index([partnerId])
+  @@index([coupleId])
+}
+
+// Was: the embedded response[] array ({ question, answer })
+model QuestionnaireResponse {
+  id       String @id @default(cuid())
+  question String
+  answer   String
+
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+
+  @@index([questionnaireId])
+}
+
+model Form {
+  id        String   @id @default(cuid())
+  name      String
+  link      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Resource {
+  id        String   @id @default(cuid())
+  name      String
+  uploads   Json?    // [{ id, name }]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -40,10 +40,10 @@ const addCouples = async (request: Request, response: Response) => {
       }),
     ]);
 
-    const ids = partners.map((result: any) => result.value._id);
+    const ids = partners.map((result: any) => result.value.id);
     console.log("uploadedFiles", uploadedFiles);
     const couple = await CouplesService.createPartner(ids, uploadedFiles[0]);
-    const data = await CouplesService.getCouple({ _id: couple._id });
+    const data = await CouplesService.getCouple({ id: couple.id });
     return response.status(201).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
@@ -61,20 +61,27 @@ const addCouplesDetails = async (request: Request, response: Response) => {
       formattedData
     );
     if (details) {
-      const partnerPhoneNumber = get(details, "partner.phoneNumber", "");
+      const partnerPhoneNumber = get(
+        details,
+        "partner.phoneNumber",
+        ""
+      ) as string;
       const foundPartner = await CouplesDetailsService.findPartner(
         partnerPhoneNumber
       );
 
       if (foundPartner) {
         const couple = await CouplesService.getCouple({
-          partners: { $in: foundPartner._id },
+          partnerId: foundPartner.id,
         });
-        if (couple && !couple.partners.includes(details._id)) {
-          await CouplesService.updateWithPartner(foundPartner._id, details._id);
+        if (
+          couple &&
+          !couple.couplesInfo.some((p: any) => p.id === details.id)
+        ) {
+          await CouplesService.updateWithPartner(foundPartner.id, details.id);
         }
       } else {
-        await CouplesService.createPartner([details._id]);
+        await CouplesService.createPartner([details.id]);
       }
       const io = getIO();
       io.to(`headcounsellor`).emit("formSubmitted");
@@ -93,7 +100,7 @@ const unAssignedCouples = async (request: Request, response: Response) => {
     const unassignedCouples = data.map((result) => {
       return {
         couple: result.couplesInfo,
-        id: result._id,
+        id: result.id,
       };
     });
     return response.status(200).json(unassignedCouples);
@@ -118,7 +125,7 @@ const assignCounsellor = async (request: Request, response: Response) => {
     );
 
     const counsellor = await UsersDetailsService.getUser(counsellorId);
-    const couple = await CouplesService.getCouple({ _id: coupleId });
+    const couple = await CouplesService.getCouple({ id: coupleId });
     const name1 = get(couple, "couplesInfo[0].name", "");
     const name2 = get(couple, "couplesInfo[1].name", "");
     const link = `${process.env.APP_URL}`;
@@ -165,7 +172,7 @@ router.get(
 const getCouple = async (request: Request, response: Response) => {
   try {
     const coupleId = request.params.coupleId;
-    const data = await CouplesService.getCouple({ _id: coupleId });
+    const data = await CouplesService.getCouple({ id: coupleId });
     return response.status(200).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
@@ -186,7 +193,7 @@ const markLessonAsCompleted = async (request: Request, response: Response) => {
     const coupleId = request.params.coupleId;
     const body = request.body;
     await CouplesService.updateCoupleLessons(coupleId, body);
-    const data = await CouplesService.getCouple({ _id: coupleId });
+    const data = await CouplesService.getCouple({ id: coupleId });
     return response.status(200).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });

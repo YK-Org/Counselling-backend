@@ -1,18 +1,20 @@
-import { IForms, Forms } from "../../mongoose/models/Forms";
+import prisma from "../../prisma/client";
+import { IForms } from "../../types/models/Forms";
 
 class FormsService {
   async createForms(data: IForms) {
     try {
-      const response = await Forms.create(data);
-      return response;
+      return await prisma.form.create({
+        data: { name: data.name, link: data.link },
+      });
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
-  async getForms(query: any) {
+
+  async getForms(query: any = {}) {
     try {
-      const response = await Forms.find(query);
-      return response;
+      return await prisma.form.findMany({ where: query });
     } catch (e: any) {
       throw new Error(e.message);
     }

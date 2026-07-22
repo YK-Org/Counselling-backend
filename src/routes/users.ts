@@ -90,7 +90,7 @@ const changePassword = async (request: Request, response: Response) => {
   try {
     const oldPassword = request.body.oldPassword;
     const password = request.body.password;
-    const id = (request as AuthenticatedRequest).user._id;
+    const id = (request as AuthenticatedRequest).user.id;
 
     // Validate that new password is different from old password
     if (password === oldPassword) {
@@ -121,7 +121,7 @@ const changePassword = async (request: Request, response: Response) => {
 
     if (getUser) {
       const userData: any = {
-        ...omit(getUser.toObject(), [
+        ...omit(getUser, [
           "password",
           "__v",
           "createdAt",
@@ -166,7 +166,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
   const file = request.file as Express.Multer.File;
 
   try {
-    const userId = (request as AuthenticatedRequest).user._id;
+    const userId = (request as AuthenticatedRequest).user.id;
 
     if (!file) {
       return handleValidationError(response, "No file uploaded");
@@ -222,14 +222,14 @@ router.post(
 
 const getUserProfile = async (request: Request, response: Response) => {
   try {
-    const userId = (request as AuthenticatedRequest).user._id;
+    const userId = (request as AuthenticatedRequest).user.id;
     const user = await UserService.getUser(userId);
 
     if (!user) {
       return handleNotFoundError(response, "User not found");
     }
 
-    const userData = omit(user.toObject(), [
+    const userData = omit(user, [
       "password",
       "__v",
       "tokenIssuedAt",
@@ -254,7 +254,7 @@ router.get(
 
 const getProfilePicture = async (request: Request, response: Response) => {
   try {
-    const userId = (request as AuthenticatedRequest).user._id;
+    const userId = (request as AuthenticatedRequest).user.id;
     const user = await UserService.getUser(userId);
 
     if (!user || !user.profilePicture) {

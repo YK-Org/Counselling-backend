@@ -1,14 +1,9 @@
 import app from "./app";
-import mongoose from "mongoose";
+import prisma from "./prisma/client";
 import { initialize } from "./socket";
 import { v2 as cloudinary } from "cloudinary";
 
-const { MONGODB_URL = "", PORT, CLOUD_NAME, API_KEY, API_SECRET } = process.env;
-try {
-  mongoose.connect(MONGODB_URL, {});
-} catch (error) {
-  console.error(error);
-}
+const { PORT, CLOUD_NAME, API_KEY, API_SECRET } = process.env;
 
 cloudinary.config({
   cloud_name: CLOUD_NAME,
@@ -17,8 +12,23 @@ cloudinary.config({
 });
 
 const port = PORT || 3000;
-const server = app.listen(port, () => {
-  return console.log(`Express is listening at http://localhost:${port}`);
-});
 
-initialize(server);
+const start = async () => {
+  try {
+    await prisma.$connect();
+    console.log("Connected to Postgres");
+  } catch (error) {
+    // A failed DB connection is fatal — fail fast instead of serving requests
+    // against a disconnected database.
+    console.error("Failed to connect to Postgres:", error);
+    process.exit(1);
+  }
+
+  const server = app.listen(port, () => {
+    return console.log(`Express is listening at http://localhost:${port}`);
+  });
+
+  initialize(server);
+};
+
+start();

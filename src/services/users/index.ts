@@ -1,41 +1,69 @@
-import { Types } from "mongoose";
-import { User } from "../../mongoose/models/Users";
-import { IUser } from "./../../mongoose/models/Users";
+import bcrypt from "bcrypt";
+import prisma from "../../prisma/client";
+import { IUser } from "../../types/models/Users";
+
+// Shape a counsellor's couples into the legacy `couplesInfo` structure the
+// frontend expects (partners were previously exposed under that virtual).
+const shapeCounsellor = (counsellor: any) => {
+  if (!counsellor) return counsellor;
+  const { couples, ...rest } = counsellor;
+  return {
+    ...rest,
+    couples: (couples || []).map((couple: any) => {
+      const { partners, ...coupleRest } = couple;
+      return { ...coupleRest, couplesInfo: partners };
+    }),
+  };
+};
 
 class UserService {
-  async createUser(data: IUser) {
+  async createUser(data: Partial<IUser>) {
     try {
-      const response = await User.create(data);
+      const password = await bcrypt.hash(data.password as string, 10);
+      const response = await prisma.user.create({
+        data: {
+          email: data.email as string,
+          firstName: data.firstName as string,
+          lastName: data.lastName as string,
+          password,
+          phoneNumber: data.phoneNumber,
+          role: (data.role as any) || "counsellor",
+          ...(data.status ? { status: data.status as any } : {}),
+        },
+      });
       return response;
     } catch (e: any) {
-      // throw new Error(e.message);
+      // Preserve previous behaviour: swallow create errors and return undefined.
     }
   }
 
-  async updateUser(data: Partial<IUser>, id: Types.ObjectId | string) {
+  async updateUser(data: any, id: string) {
     try {
-      const response = await User.findByIdAndUpdate(id, data, { new: true });
+      const response = await prisma.user.update({
+        where: { id },
+        data,
+      });
       return response;
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async getUser(id: Types.ObjectId | string) {
+  async getUser(id: string) {
     try {
-      const response = await User.findById(id);
+      const response = await prisma.user.findUnique({ where: { id } });
       return response;
     } catch (e: any) {
-      // throw new Error(e.message);
+      // Preserve previous behaviour: return undefined on error.
     }
   }
 
   async getUsers(query: any) {
     try {
-      const response = await User.find(query);
+      const response = await prisma.user.findMany({ where: query });
       return response;
     } catch (e: any) {
-      // throw new Error(e.message);
+      // Preserve previous behaviour: return undefined on error.
     }
   }
 
@@ -48,11 +76,9 @@ class UserService {
 
   async countAvailableCounsellors() {
     try {
-      const response = await User.find({
-        role: "counsellor",
-        availability: true,
-        status: "active",
-      }).count();
+      const response = await prisma.user.count({
+        where: { role: "counsellor", availability: true, status: "active" },
+      });
       return response;
     } catch (e: any) {
       throw new Error(e.message);
@@ -61,31 +87,35 @@ class UserService {
 
   async getCounsellors() {
     try {
-      const response = await User.find({
-        role: "counsellor",
-      }).populate({
-        path: "couples",
-        populate: {
-          path: "couplesInfo",
-          select: "name",
+      const response = await prisma.user.findMany({
+        where: { role: "counsellor" },
+        include: {
+          couples: {
+            include: {
+              partners: { select: { id: true, name: true } },
+            },
+          },
         },
       });
-      return response;
+      return response.map(shapeCounsellor);
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async getCounsellor(query: any) {
+  async getCounsellor(query: { id: string }) {
     try {
-      const response = await User.findById(query).populate({
-        path: "couples",
-        populate: {
-          path: "couplesInfo",
-          select: "name",
+      const response = await prisma.user.findUnique({
+        where: { id: query.id },
+        include: {
+          couples: {
+            include: {
+              partners: { select: { id: true, name: true } },
+            },
+          },
         },
       });
-      return response;
+      return shapeCounsellor(response);
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -93,12 +123,14 @@ class UserService {
 
   async searchCounsellors(search: string) {
     try {
-      const response = await User.find({
-        $or: [
-          { lastName: { $regex: search, $options: "i" } },
-          { firstName: { $regex: search, $options: "i" } },
-        ],
-        role: "counsellor",
+      const response = await prisma.user.findMany({
+        where: {
+          role: "counsellor",
+          OR: [
+            { lastName: { contains: search, mode: "insensitive" } },
+            { firstName: { contains: search, mode: "insensitive" } },
+          ],
+        },
       });
       return response;
     } catch (e: any) {
@@ -106,11 +138,20 @@ class UserService {
     }
   }
 
-  async createCounsellor(data: IUser) {
+  async createCounsellor(data: Partial<IUser>) {
     try {
-      data.role = "counsellor";
-      data.status = "active";
-      const response = await User.create(data);
+      const password = await bcrypt.hash(data.password as string, 10);
+      const response = await prisma.user.create({
+        data: {
+          email: data.email as string,
+          firstName: data.firstName as string,
+          lastName: data.lastName as string,
+          password,
+          phoneNumber: data.phoneNumber,
+          role: "counsellor",
+          status: "active",
+        },
+      });
       return response;
     } catch (e: any) {
       throw new Error(e.message);

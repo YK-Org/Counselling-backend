@@ -1,5 +1,4 @@
 import { Request } from "express";
-import { Types } from "mongoose";
 
 /**
  * Authenticated Request Interface
@@ -7,7 +6,7 @@ import { Types } from "mongoose";
  */
 export interface AuthenticatedRequest extends Request {
   user: {
-    _id: string;
+    id: string;
     role: "headCounsellor" | "counsellor";
     email: string;
     firstName?: string;

@@ -50,11 +50,10 @@ router.get(
 const deleteResources = async (request: Request, response: Response) => {
   try {
     const { resourcesId } = request.params;
-    const lesson = await ResourcesService.getLesson({
-      _id: resourcesId,
-    });
-    if (lesson && lesson.uploads && lesson.uploads.length) {
-      await MediaService.deleteFilesInDrive(lesson.uploads);
+    const lesson = await ResourcesService.getLesson({ id: resourcesId });
+    const uploads = (lesson?.uploads as { id: string; name: string }[]) || [];
+    if (uploads.length) {
+      await MediaService.deleteFilesInDrive(uploads);
     }
     await ResourcesService.deleteLesson(resourcesId);
     return response.status(201).json({});

@@ -7,8 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start-dev": "nodemon build/index.js",
     "build:watch": "rimraf ./build && tsc --watch",
-    "build": "rimraf ./build && tsc",
-    "start": "npm run build && node build/index.js"
+    "build": "prisma generate && rimraf ./build && tsc",
+    "start": "npm run build && node build/index.js",
+    "postinstall": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
   },
   "keywords": [],
   "author": "",
@@ -30,6 +34,7 @@
     "typescript": "^5.0.3"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "archiver": "^7.0.1",
     "awesome-phonenumber": "^6.0.0",
     "bcrypt": "^5.1.0",
@@ -45,9 +50,9 @@
     "jsonwebtoken": "^9.0.0",
     "lodash": "^4.17.21",
     "mime-types": "^2.1.35",
-    "mongoose": "^7.0.3",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.4",
+    "prisma": "^6.19.3",
     "socket.io": "^4.6.2",
     "ulid": "^2.3.0"
   }

@@ -10,6 +10,7 @@ import { omit } from "lodash";
 import * as jwt from "jsonwebtoken";
 import { sendMail } from "../helpers/mailer";
 import { passwordRequestMail } from "../helpers/mailTemplate";
+import { authLimiter } from "../middleware/rateLimiter";
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ const login = async (request: Request, response: Response) => {
 
     if (user?.length && (await bcrypt.compare(password, user[0].password))) {
       const userData: any = {
-        ...omit(user[0].toObject(), [
+        ...omit(user[0], [
           "password",
           "__v",
           "createdAt",
@@ -54,7 +55,7 @@ const login = async (request: Request, response: Response) => {
 
 router.post(
   "/login",
-  [MiddlewareService.requestValidation(LoginValidation)],
+  [authLimiter, MiddlewareService.requestValidation(LoginValidation)],
   login
 );
 
@@ -68,24 +69,46 @@ const register = async (request: Request, response: Response) => {
       return response.status(409).send("User Already Exists");
     }
 
-    const user = await UserService.createUser(request.body);
+    // Public registration must never allow a client to self-assign a
+    // privileged role. Force the role server-side regardless of input.
+    // Elevated roles (headCounsellor/admin) are granted through
+    // authenticated admin flows, not this endpoint.
+    const user = await UserService.createUser({
+      ...request.body,
+      role: "counsellor",
+    });
 
-    let data = {} as IRegisterResponse;
-    if (user) {
-      const token = AuthService.generateAccessToken(user);
-      data.token = token.token;
-
-      await UserService.updateUser(
-        {
-          tokenIssuedAt: token.issuedAt,
-        },
-        user.id
-      );
+    if (!user) {
+      return response.status(400).send("Unable to create user");
     }
 
-    return response.status(201).json(user);
-  } catch (err) {
-    console.log(err);
+    // Build the sanitized user BEFORE signing the token — otherwise the
+    // password hash ends up embedded in the (client-readable) JWT payload.
+    const userData: any = omit(user, [
+      "password",
+      "__v",
+      "createdAt",
+      "updatedAt",
+    ]);
+
+    const token = AuthService.generateAccessToken(userData);
+
+    await UserService.updateUser(
+      {
+        tokenIssuedAt: token.issuedAt,
+      },
+      user.id
+    );
+
+    const data: IRegisterResponse = {
+      user: userData,
+      token: token.token,
+    };
+
+    return response.status(201).json(data);
+  } catch (err: any) {
+    console.error(err);
+    return response.status(500).send("Failed to register user");
   }
 };
 
@@ -100,10 +123,10 @@ const authCheck = async (request: Request, response: Response) => {
     const authHeader = request.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
 
-    if (token == null) return response.status(401);
+    if (token == null) return response.sendStatus(401);
     const decoded: any = jwt.verify(token, process.env.TOKEN_SECRET as string);
     if (!decoded) {
-      return response.status(401);
+      return response.sendStatus(401);
     }
 
     const data = {
@@ -130,7 +153,7 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
     const user = await UserService.getUsers({ email });
     if (user && user.length) {
       const userData: any = {
-        ...omit(user[0].toObject(), [
+        ...omit(user[0], [
           "password",
           "__v",
           "createdAt",
@@ -162,12 +185,12 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/forgot-password/request", [], forgotPasswordRequest);
+router.post("/forgot-password/request", [authLimiter], forgotPasswordRequest);
 
 const forgotPasswordReset = async (request: Request, response: Response) => {
   try {
     const password = request.body.password;
-    const id = (request as any).user._id;
+    const id = (request as any).user.id;
     const encryptedUserPassword = await bcrypt.hash(password, 10);
     const user = await UserService.updateUser(
       { password: encryptedUserPassword },
@@ -175,7 +198,7 @@ const forgotPasswordReset = async (request: Request, response: Response) => {
     );
     if (user) {
       const userData: any = {
-        ...omit(user.toObject(), ["password", "__v", "createdAt", "updatedAt"]),
+        ...omit(user, ["password", "__v", "createdAt", "updatedAt"]),
       };
       const token = AuthService.generateAccessToken(userData);
       const data = {
@@ -208,7 +231,7 @@ router.post(
 const confirmPassword = async (request: Request, response: Response) => {
   try {
     const password = request.body.password;
-    const id = (request as any).user._id;
+    const id = (request as any).user.id;
     const user = await UserService.getUser(id);
     const checkPassword = await bcrypt.compare(password, user?.password || "");
     if (!checkPassword) {

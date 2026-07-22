@@ -1,27 +1,26 @@
-import { ILessons, Lessons } from "../../mongoose/models/Lessons";
+import prisma from "../../prisma/client";
+import { ILessons } from "../../types/models/Lessons";
 
 class LessonsService {
   async createLessons(data: ILessons) {
     try {
-      const response = await Lessons.create(data);
-      return response;
-    } catch (e: any) {
-      throw new Error(e.message);
-    }
-  }
-  async getLessons(query: any) {
-    try {
-      const response = await Lessons.find(query);
-      return response;
+      return await prisma.lesson.create({ data: { name: data.name } });
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async getLesson(query: any) {
+  async getLessons(query: any = {}) {
     try {
-      const response = await Lessons.findOne(query);
-      return response;
+      return await prisma.lesson.findMany({ where: query });
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  async getLesson(query: { id: string }) {
+    try {
+      return await prisma.lesson.findUnique({ where: { id: query.id } });
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -29,16 +28,15 @@ class LessonsService {
 
   async deleteLesson(lessonId: string) {
     try {
-      await Lessons.deleteOne({ _id: lessonId });
+      await prisma.lesson.delete({ where: { id: lessonId } });
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async countLessons(query = {}) {
+  async countLessons(query: any = {}) {
     try {
-      const response = await Lessons.find(query).count();
-      return response;
+      return await prisma.lesson.count({ where: query });
     } catch (e: any) {
       throw new Error(e.message);
     }

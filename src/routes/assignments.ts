@@ -19,7 +19,7 @@ const addAssignments = async (request: Request, response: Response) => {
     }
     body.uploads = uploadedFiles;
     const result = await AssignmentsService.createAssignment(body);
-    const data = await AssignmentsService.getAssignment({ _id: result.id });
+    const data = await AssignmentsService.getAssignment({ id: result.id });
     return response.status(201).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
@@ -38,11 +38,10 @@ router.post(
 const deleteAssignments = async (request: Request, response: Response) => {
   try {
     const { assignmentsId } = request.params;
-    const assignment = await AssignmentsService.getAssignment({
-      _id: assignmentsId,
-    });
-    if (assignment && assignment.uploads.length) {
-      await MediaService.deleteFilesInDrive(assignment.uploads);
+    const assignment = await AssignmentsService.getAssignment({ id: assignmentsId });
+    const uploads = (assignment?.uploads as { id: string; name: string }[]) || [];
+    if (uploads.length) {
+      await MediaService.deleteFilesInDrive(uploads);
     }
     await AssignmentsService.deleteAssignment(assignmentsId);
     return response.status(201).json({});

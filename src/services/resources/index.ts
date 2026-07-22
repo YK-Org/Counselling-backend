@@ -1,27 +1,34 @@
-import { IResources, Resources } from "../../mongoose/models/Resources";
+import prisma from "../../prisma/client";
+import { IResources } from "../../types/models/Resources";
 
 class ResourcesService {
   async createResources(data: IResources) {
     try {
-      const response = await Resources.create(data);
-      return response;
-    } catch (e: any) {
-      throw new Error(e.message);
-    }
-  }
-  async getResources(query: any) {
-    try {
-      const response = await Resources.find(query).sort({ order: 1 });
-      return response;
+      return await prisma.resource.create({
+        data: {
+          name: data.name,
+          ...(data.uploads ? { uploads: data.uploads as any } : {}),
+        },
+      });
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async getLesson(query: any) {
+  async getResources(query: any = {}) {
     try {
-      const response = await Resources.findOne(query);
-      return response;
+      return await prisma.resource.findMany({
+        where: query,
+        orderBy: { createdAt: "asc" },
+      });
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  async getLesson(query: { id: string }) {
+    try {
+      return await prisma.resource.findUnique({ where: { id: query.id } });
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -29,16 +36,15 @@ class ResourcesService {
 
   async deleteLesson(resourceId: string) {
     try {
-      await Resources.deleteOne({ _id: resourceId });
+      await prisma.resource.delete({ where: { id: resourceId } });
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async countResources(query = {}) {
+  async countResources(query: any = {}) {
     try {
-      const response = await Resources.find(query).count();
-      return response;
+      return await prisma.resource.count({ where: query });
     } catch (e: any) {
       throw new Error(e.message);
     }

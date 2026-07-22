@@ -1,10 +1,8 @@
 import jwt from "jsonwebtoken";
-import { IUser } from "./../../mongoose/models/Users";
-import { HydratedDocument } from "mongoose";
 
 class AuthService {
   generateAccessToken = (
-    user: HydratedDocument<Partial<IUser>>,
+    user: Record<string, any>,
     tokenType = "app",
     expires = "86400s"
   ) => {

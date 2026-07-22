@@ -1,6 +1,5 @@
-import { IsDefined, IsEmail, IsString, IsIn } from "class-validator";
+import { IsDefined, IsEmail, IsString } from "class-validator";
 import { Expose } from "class-transformer";
-import { userRoles } from "../../mongoose/models/Users";
 
 export class RegisterValidation {
   @IsDefined()
@@ -22,8 +21,6 @@ export class RegisterValidation {
   @IsString()
   lastName: String;
 
-  @IsDefined()
-  @Expose()
-  @IsIn(userRoles)
-  role: String;
+  // `role` is intentionally omitted — it is forced server-side in the
+  // register handler so clients cannot self-assign a privileged role.
 }

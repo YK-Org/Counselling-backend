@@ -1,27 +1,26 @@
-import { Assignments } from "../../mongoose/models/Assignments";
+import prisma from "../../prisma/client";
+
+const lessonInclude = { lesson: { select: { id: true, name: true } } };
 
 class AssignmentsService {
-  async getAssignments(query: any) {
+  async getAssignments(query: any = {}) {
     try {
-      const response = await Assignments.find(query)
-        .sort({ createdAt: -1 })
-        .populate({
-          path: "lesson",
-          select: "name order",
-        });
-      return response;
+      return await prisma.assignment.findMany({
+        where: query,
+        orderBy: { createdAt: "desc" },
+        include: lessonInclude,
+      });
     } catch (e: any) {
       throw new Error(e.message);
     }
   }
 
-  async getAssignment(query: any) {
+  async getAssignment(query: { id: string }) {
     try {
-      const response = await Assignments.findOne(query).populate({
-        path: "lesson",
-        select: "name order",
+      return await prisma.assignment.findUnique({
+        where: { id: query.id },
+        include: lessonInclude,
       });
-      return response;
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -32,17 +31,18 @@ class AssignmentsService {
     couplesId,
     lessonId,
   }: {
-    uploads: string[];
+    uploads: { id: string; name: string }[];
     couplesId: string;
     lessonId: string;
   }) {
     try {
-      const response = await Assignments.create({
-        couplesId,
-        lessonId,
-        uploads,
+      return await prisma.assignment.create({
+        data: {
+          couplesId,
+          lessonId,
+          ...(uploads ? { uploads: uploads as any } : {}),
+        },
       });
-      return response;
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -50,7 +50,7 @@ class AssignmentsService {
 
   async deleteAssignment(assignmentId: string) {
     try {
-      await Assignments.deleteOne({ _id: assignmentId });
+      await prisma.assignment.delete({ where: { id: assignmentId } });
     } catch (e: any) {
       throw new Error(e.message);
     }

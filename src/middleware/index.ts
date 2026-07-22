@@ -34,7 +34,7 @@ class MiddlewareService {
         ) as JwtPayload;
 
         req.user = decoded.user;
-        const user = await UsersService.getUser(req.user._id);
+        const user = await UsersService.getUser(req.user.id);
         if (!user || (user && decoded.iat !== user.tokenIssuedAt)) {
           return res
             .status(403)
@@ -96,10 +96,10 @@ class MiddlewareService {
     }
 
     const coupleId = req.params.coupleId;
-    const userId = get(req, "user._id", "");
-    const couple = await CouplesService.getCouple({ _id: coupleId });
+    const userId = get(req, "user.id", "");
+    const couple = await CouplesService.getCouple({ id: coupleId });
 
-    if (userId === couple?.counsellorId.toString()) {
+    if (couple?.counsellorId && userId === couple.counsellorId.toString()) {
       return next();
     }
 
@@ -120,16 +120,12 @@ class MiddlewareService {
   checkPasswordReset = (req: any, res: Response, next: any) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
-    console.log("token", token);
     if (token == null) return res.sendStatus(401);
     jwt.verify(
       token,
       process.env.TOKEN_SECRET as string,
       (err: any, decoded: any) => {
-        console.log(err);
-
         if (err) return res.sendStatus(403);
-        console.log("decoded", decoded);
         if (decoded.tokenType !== "passwordReset") {
           return res.sendStatus(401);
         }

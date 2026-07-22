@@ -42,9 +42,7 @@ router.get(
 const deleteLessons = async (request: Request, response: Response) => {
   try {
     const { lessonsId } = request.params;
-    const lesson = await LessonsService.getLesson({
-      _id: lessonsId,
-    });
+    const lesson = await LessonsService.getLesson({ id: lessonsId });
     await LessonsService.deleteLesson(lessonsId);
     return response.status(201).json({});
   } catch (err: any) {
