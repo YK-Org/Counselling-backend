@@ -426,6 +426,46 @@ router.get(
   getProfilePicture
 );
 
+const deleteProfilePicture = async (request: Request, response: Response) => {
+  try {
+    const userId = (request as AuthenticatedRequest).user.id;
+    const user = await UserService.getUser(userId);
+
+    if (!user?.profilePicture) {
+      return handleNotFoundError(response, "No profile picture to delete");
+    }
+
+    const fileId = user.profilePicture;
+
+    // Clear the reference first: the column is the source of truth, and if the
+    // Drive delete fails afterwards the worst case is an orphaned file rather
+    // than a user pointing at an image that no longer exists.
+    await UserService.updateUser({ profilePicture: null }, userId);
+
+    await MediaService.deleteFilesInDrive([{ id: fileId }]).catch((err: any) =>
+      console.error("Could not delete profile picture from Drive", err?.message)
+    );
+    await MediaService.evictCachedProfilePicture(fileId);
+
+    return response
+      .status(200)
+      .json({ message: "Profile picture removed successfully" });
+  } catch (err: any) {
+    return handleError(
+      response,
+      err,
+      "deleteProfilePicture",
+      "Failed to remove profile picture"
+    );
+  }
+};
+
+router.delete(
+  "/profile/picture",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  deleteProfilePicture
+);
+
 const getUserPicture = async (request: Request, response: Response) => {
   try {
     const { userId } = request.params;
