@@ -18,6 +18,11 @@ import { Readable } from "stream";
 // counselling records, and a signed URL is a bearer token for one object.
 const SIGNED_URL_TTL_SECONDS = 600;
 
+// Below this, uploads are read into memory and sent as a single fixed-length
+// payload rather than streamed. Profile pictures are capped at 5MB elsewhere;
+// this is generous enough to cover documents while bounding memory use.
+const BUFFER_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+
 // Prefixes stand in for the old Drive folders. Objects are addressed by key, so
 // the "folder" is just the first path segment.
 export type UploadType =
@@ -92,18 +97,26 @@ class StorageService {
     for (const file of files) {
       const key = this.buildKey(uploadType, file.originalname || file.filename);
 
-      // Multer reports the size; without it the SDK cannot length-prefix the
-      // body and falls back to chunked transfer, which is the fragile path.
       const size =
         typeof file.size === "number"
           ? file.size
           : (await fs.stat(file.path)).size;
 
+      // Streaming a body forces the SDK down its chunked-transfer path, which
+      // R2 has rejected with SignatureDoesNotMatch. A Buffer is signed as a
+      // single fixed-length payload and has been reliable, so anything small
+      // enough to hold in memory is sent that way. Larger files still stream —
+      // buffering an arbitrarily large upload would be worse than the risk.
+      const body =
+        size <= BUFFER_UPLOAD_MAX_BYTES
+          ? await fs.readFile(file.path)
+          : createReadStream(file.path);
+
       await this.getClient().send(
         new PutObjectCommand({
           Bucket: this.bucket(),
           Key: key,
-          Body: createReadStream(file.path),
+          Body: body,
           ContentLength: size,
           ContentType:
             file.mimetype ||
