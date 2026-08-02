@@ -8,11 +8,14 @@ import { omit } from "lodash";
 import multer from "multer";
 import MediaService from "../services/media";
 import crypto from "crypto";
+import path from "path";
+import { lookup } from "mime-types";
 import {
   handleError,
   handleValidationError,
   handleNotFoundError,
   handleConflictError,
+  handleForbiddenError,
 } from "../helpers/errorHandler";
 import { FILE_UPLOAD_LIMITS } from "../constants/counsellor-status";
 import { AuthenticatedRequest } from "../types";
@@ -287,10 +290,22 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
     }
 
     // Store the Google Drive file ID
+    const previous = await UserService.getUser(userId);
     await UserService.updateUser(
       { profilePicture: uploadedFiles[0].id },
       userId
     );
+
+    // Drop the superseded image. Nothing references it once the column moves
+    // on, so leaving it would accumulate orphans in Drive and on disk.
+    if (previous?.profilePicture) {
+      await MediaService.deleteFilesInDrive([
+        { id: previous.profilePicture },
+      ]).catch((err: any) =>
+        console.error("Could not delete previous profile picture", err?.message)
+      );
+      await MediaService.evictCachedProfilePicture(previous.profilePicture);
+    }
 
     return response.status(200).json({
       message: "Profile picture uploaded successfully",
@@ -357,6 +372,34 @@ router.get(
   getUserProfile
 );
 
+// Serves a picture from the on-disk cache. The Drive file id is immutable, so
+// it works as a strong ETag: a client holding the current id never needs the
+// bytes again, and a changed picture has a different id and misses the cache.
+const sendProfilePicture = async (
+  request: Request,
+  response: Response,
+  fileId: string
+) => {
+  const etag = `"${fileId}"`;
+
+  if (request.headers["if-none-match"] === etag) {
+    return response.status(304).end();
+  }
+
+  const filePath = await MediaService.getCachedProfilePicture(fileId);
+
+  response.setHeader("ETag", etag);
+  // Private: these sit behind authentication and must not land in a shared
+  // cache. Revalidation is cheap because the ETag never changes for an id.
+  response.setHeader("Cache-Control", "private, max-age=86400");
+  response.setHeader(
+    "Content-Type",
+    (lookup(filePath) as string) || "application/octet-stream"
+  );
+
+  return response.sendFile(path.resolve(filePath));
+};
+
 const getProfilePicture = async (request: Request, response: Response) => {
   try {
     const userId = (request as AuthenticatedRequest).user.id;
@@ -366,20 +409,7 @@ const getProfilePicture = async (request: Request, response: Response) => {
       return handleNotFoundError(response, "Profile picture not found");
     }
 
-    // Get file from Google Drive
-    const fileName = await MediaService.getFromGoogleDrive(user.profilePicture);
-
-    // Send the file
-    return response.download(fileName, "profile-picture", (err: any) => {
-      if (err) {
-        response.status(500).send("Error downloading file");
-      }
-      // Clean up the temporary file
-      const fs = require("fs");
-      fs.unlink(fileName, (unlinkErr: any) => {
-        if (unlinkErr) console.error("Error deleting temp file:", unlinkErr);
-      });
-    });
+    return await sendProfilePicture(request, response, user.profilePicture);
   } catch (err: any) {
     return handleError(
       response,
@@ -394,6 +424,41 @@ router.get(
   "/profile/picture",
   [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
   getProfilePicture
+);
+
+const getUserPicture = async (request: Request, response: Response) => {
+  try {
+    const { userId } = request.params;
+    const requester = (request as AuthenticatedRequest).user;
+
+    // Head counsellors manage everyone, so they may see any picture. Everyone
+    // else may only fetch their own — a counsellor has no reason to enumerate
+    // colleagues through this route.
+    if (requester.role !== "headCounsellor" && requester.id !== userId) {
+      return handleForbiddenError(response);
+    }
+
+    const user = await UserService.getUser(userId);
+
+    if (!user || !user.profilePicture) {
+      return handleNotFoundError(response, "Profile picture not found");
+    }
+
+    return await sendProfilePicture(request, response, user.profilePicture);
+  } catch (err: any) {
+    return handleError(
+      response,
+      err,
+      "getUserPicture",
+      "Failed to retrieve profile picture"
+    );
+  }
+};
+
+router.get(
+  "/users/:userId/picture",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  getUserPicture
 );
 
 export default router;

@@ -149,6 +149,49 @@ class MediaService {
     });
   }
 
+  // Drive file ids are immutable — replacing a picture creates a new id — so a
+  // cached copy can never go stale and the id doubles as a strong ETag.
+  // Without this every avatar render is a full Drive round-trip through the
+  // server, which does not survive contact with a list of counsellors.
+  private profilePictureCacheDir = path.resolve(
+    __dirname,
+    "../../../uploads/cache/profile-pictures"
+  );
+
+  async getCachedProfilePicture(fileId: string): Promise<string> {
+    await fs.mkdir(this.profilePictureCacheDir, { recursive: true });
+
+    const entries = await fs.readdir(this.profilePictureCacheDir);
+    const cached = entries.find((entry) => entry.startsWith(`${fileId}.`));
+    if (cached) return path.join(this.profilePictureCacheDir, cached);
+
+    // getFromGoogleDrive writes to a ulid-named file in the working directory;
+    // move it into the cache under the id so the next request is a local read.
+    const downloaded = await this.getFromGoogleDrive(fileId);
+    const destination = path.join(
+      this.profilePictureCacheDir,
+      `${fileId}${path.extname(downloaded)}`
+    );
+    await fs.rename(downloaded, destination);
+    return destination;
+  }
+
+  async evictCachedProfilePicture(fileId: string) {
+    try {
+      const entries = await fs.readdir(this.profilePictureCacheDir);
+      await Promise.all(
+        entries
+          .filter((entry) => entry.startsWith(`${fileId}.`))
+          .map((entry) =>
+            fs.unlink(path.join(this.profilePictureCacheDir, entry))
+          )
+      );
+    } catch (error: any) {
+      // A missing cache directory or entry is not worth failing an upload over.
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+
   async viewFileInDrive(fileId: string | string[]): Promise<string[]> {
     try {
       let fileNames: string[] = [];
