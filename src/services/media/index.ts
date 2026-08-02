@@ -45,6 +45,16 @@ class MediaService {
         letters: process.env.LETTERS_FOLDER_ID,
         "profile-pictures": process.env.PROFILE_PICTURES_FOLDER_ID,
       };
+      // Without this the folder id goes to Drive as `parents: [undefined]`,
+      // which fails with an opaque API error at upload time rather than
+      // naming the variable that is actually missing.
+      const folderId = get(mapFolders, uploadType);
+      if (!folderId) {
+        throw new Error(
+          `No Drive folder configured for "${uploadType}" — check the corresponding *_FOLDER_ID environment variable`
+        );
+      }
+
       const result = await this.authorize();
       const drive = await google.drive({ version: "v3", auth: result });
       const uploadedFiles: { id: string; name: string }[] = [];
@@ -61,7 +71,7 @@ class MediaService {
           fields: "id, name",
           requestBody: {
             name: `${file.filename}/${file.originalname}`,
-            parents: [get(mapFolders, uploadType)],
+            parents: [folderId],
           },
         });
 
