@@ -48,6 +48,10 @@ model User {
   status         UserStatus @default(awaitingConfirmation)
   availability   Boolean    @default(true)
   tokenIssuedAt  Int?
+  // Nonce for the outstanding password-reset/invite link. Matched against the
+  // token's claim and cleared on use, which is what makes those links
+  // single-use — JWT `iat` is second-granular and cannot express this.
+  resetTokenId   String?
   profilePicture String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt

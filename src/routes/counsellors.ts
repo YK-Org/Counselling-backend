@@ -15,7 +15,7 @@ const getCounsellors = async (request: Request, response: Response) => {
   try {
     const data = await UserService.getCounsellors();
     const result = data.map((result: any) =>
-      omit(result, ["password", "__v", "createdAt", "updatedAt"])
+      omit(result, ["password","resetTokenId", "__v", "createdAt", "updatedAt"])
     );
     return response.status(200).json(result);
   } catch (err: any) {
@@ -33,7 +33,10 @@ const getCounsellor = async (request: Request, response: Response) => {
   try {
     const counsellorId = request.params.counsellorId;
     const data = await UserService.getCounsellor({ id: counsellorId });
-    return response.status(200).json(data);
+    // This response was previously sent raw — it included the bcrypt hash.
+    return response
+      .status(200)
+      .json(omit(data, ["password", "resetTokenId", "tokenIssuedAt"]));
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
   }
@@ -50,7 +53,7 @@ const searchCounsellors = async (request: Request, response: Response) => {
     const { search } = request.query as any;
     const data = await UserService.searchCounsellors(search);
     const result = data.map((result: any) =>
-      omit(result, ["password", "__v", "createdAt", "updatedAt"])
+      omit(result, ["password","resetTokenId", "__v", "createdAt", "updatedAt"])
     );
     return response.status(200).json(result);
   } catch (err: any) {
@@ -101,7 +104,7 @@ const updateCounsellor = async (request: Request, response: Response) => {
     }
 
     const data = await UserService.updateUser(body, counsellorId);
-    return response.status(200).json(omit(data, ["password", "tokenIssuedAt"]));
+    return response.status(200).json(omit(data, ["password","resetTokenId", "tokenIssuedAt"]));
   } catch (err: any) {
     return handleError(
       response,

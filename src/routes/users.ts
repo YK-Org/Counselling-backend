@@ -7,10 +7,23 @@ import AuthService from "../services/auth";
 import { omit } from "lodash";
 import multer from "multer";
 import MediaService from "../services/media";
-import { handleError, handleValidationError, handleNotFoundError } from "../helpers/errorHandler";
+import crypto from "crypto";
+import {
+  handleError,
+  handleValidationError,
+  handleNotFoundError,
+  handleConflictError,
+} from "../helpers/errorHandler";
 import { FILE_UPLOAD_LIMITS } from "../constants/counsellor-status";
 import { AuthenticatedRequest } from "../types";
-import { uploadLimiter, passwordChangeLimiter } from "../middleware/rateLimiter";
+import {
+  uploadLimiter,
+  passwordChangeLimiter,
+  inviteLimiter,
+} from "../middleware/rateLimiter";
+import { InviteUserValidation } from "../validationClasses/users/invite";
+import { inviteMail } from "../helpers/mailTemplate";
+import { sendMail } from "../helpers/mailer";
 
 // Configure multer with validation
 const { PROFILE_PICTURE } = FILE_UPLOAD_LIMITS;
@@ -86,6 +99,81 @@ router.get(
   dashboardInit
 );
 
+// How long an invitee has to set their password before the link dies.
+const INVITE_TOKEN_TTL = "7d";
+
+const inviteUser = async (request: Request, response: Response) => {
+  try {
+    const { email, firstName, lastName, phoneNumber, role } = request.body;
+
+    // The invitee picks their own password via the emailed link. Until then the
+    // account is unreachable: this placeholder is random, never disclosed, and
+    // no plaintext matches its hash. Emailing a generated password instead
+    // would leave a working credential sitting in an inbox indefinitely.
+    const unusablePassword = crypto.randomBytes(32).toString("hex");
+
+    const user = await UserService.createUser({
+      email,
+      firstName,
+      lastName,
+      phoneNumber,
+      role,
+      password: unusablePassword,
+      status: "awaitingConfirmation",
+    });
+
+    const userData: any = omit(user, [
+      "password",
+      "resetTokenId",
+      "tokenIssuedAt",
+    ]);
+
+    // Reuses the password-reset token type, so the existing
+    // /forgot-password/reset endpoint and its frontend page accept the link
+    // as-is. Setting a password there flips the account to active.
+    const resetTokenId = crypto.randomUUID();
+    await UserService.updateUser({ resetTokenId }, user.id);
+
+    const token = AuthService.generateAccessToken(
+      userData,
+      "passwordReset",
+      INVITE_TOKEN_TTL,
+      { resetTokenId }
+    );
+    const link = `${process.env.APP_URL}/password/reset?tok=${token.token}`;
+    const roleLabel =
+      user.role === "headCounsellor" ? "head counsellor" : "counsellor";
+
+    await sendMail({
+      from: "Counsellor App <counsellortrinity@gmail.com>",
+      to: email,
+      subject: "You have been invited to the Counsellor App",
+      text: "",
+      html: inviteMail(user.firstName, roleLabel, link),
+    });
+
+    return response.status(201).json(userData);
+  } catch (err: any) {
+    if (err?.code === "P2002") {
+      return handleConflictError(
+        response,
+        "A user with that email already exists"
+      );
+    }
+    return handleError(response, err, "inviteUser", "Failed to invite user");
+  }
+};
+
+router.post(
+  "/users",
+  [
+    inviteLimiter,
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.requestValidation(InviteUserValidation),
+  ],
+  inviteUser
+);
+
 const changePassword = async (request: Request, response: Response) => {
   try {
     const oldPassword = request.body.oldPassword;
@@ -123,6 +211,7 @@ const changePassword = async (request: Request, response: Response) => {
       const userData: any = {
         ...omit(getUser, [
           "password",
+          "resetTokenId",
           "__v",
           "createdAt",
           "updatedAt",
@@ -231,6 +320,7 @@ const getUserProfile = async (request: Request, response: Response) => {
 
     const userData = omit(user, [
       "password",
+      "resetTokenId",
       "__v",
       "tokenIssuedAt",
     ]);

@@ -56,6 +56,65 @@ export const passwordRequestMail = (link: string) => {
  `;
 };
 
+export const inviteMail = (firstName: string, roleLabel: string, link: string) => {
+  return `
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You have been invited</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .logo {
+      width: 100px;
+      height: auto;
+    }
+    .content {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="http://trinityunitedchurchlegon.org/assets/img/Trinity-Logo.png" alt="Logo" class="logo">
+      <h1>Welcome</h1>
+    </div>
+    <div class="content">
+      <p>Hello ${firstName},</p>
+      <p>An account has been created for you on the Counsellor App as a ${roleLabel}.</p>
+      <p>To choose your password and activate your account, click the link below:</p>
+      <a href="${link}">Set your password</a>
+      <p>This link expires in 7 days and can only be used once.</p>
+    </div>
+    <p>If the link above does not work, you can also copy and paste the following into your web browser:</p>
+    <p>${link}</p>
+    <p>Thank you,</p>
+    <p>Counsellor App</p>
+  </div>
+</body>
+</html>
+ `;
+};
+
 export const assignCounsellorMail = (
   partners: {
     name1: string;

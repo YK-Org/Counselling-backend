@@ -42,12 +42,42 @@ The app includes secure data management, Google Drive integration for file stora
    npm run prisma:deploy
    ```
 
-4. Build and run:
+4. Create the first head counsellor. Set `SEED_ADMIN_EMAIL` and
+   `SEED_ADMIN_PASSWORD` in `.env`, then:
+
+   ```bash
+   npm run prisma:seed
+   ```
+
+   The seed is idempotent — re-running it will not touch an existing account.
+   Sign in and change the password immediately.
+
+5. Build and run:
 
    ```bash
    npm run build
    npm start
    ```
+
+## User accounts
+
+Every account in this app is staff, so there is no public registration. Accounts
+are created one of two ways:
+
+- **The first head counsellor** — `npm run prisma:seed` (see above).
+- **Everyone else** — `POST /api/v1/users`, restricted to head counsellors:
+
+  ```bash
+  curl -X POST http://localhost:3000/api/v1/users \
+    -H 'Authorization: Bearer <head counsellor token>' \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"jane@example.com","firstName":"Jane","lastName":"Doe","role":"counsellor"}'
+  ```
+
+  `role` is `counsellor` or `headCounsellor`. The new account is created as
+  `awaitingConfirmation` with no usable password, and the invitee is emailed a
+  link to choose one. Setting a password through that link activates the
+  account. Invite links last 7 days and work exactly once.
 
 ## Prisma
 

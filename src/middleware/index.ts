@@ -14,7 +14,6 @@ class MiddlewareService {
       "/api/v1/forgot-password/request",
       "/api/v1/login",
       "/api/v1/forgot-password/reset",
-      "/api/v1/register",
       "/api/v1/couples/details",
       "/api/v1/questionnaire/pre-test",
       "/api/v1/questionnaire/post-test",
@@ -136,14 +135,17 @@ class MiddlewareService {
       return res.sendStatus(401);
     }
 
-    // Single-use: consuming a reset/invite link bumps the user's tokenIssuedAt
-    // (see forgotPasswordReset), so an already-spent link now predates it and
-    // is refused. Without this a link stayed replayable until it expired —
-    // harmless-ish at the 15m reset TTL, but invites live for days.
-    // Comparison is second-granular because that is JWT `iat`'s resolution.
+    // Single-use: the link carries a nonce that is stored on the user when the
+    // link is minted and cleared once it is spent, so a spent or superseded
+    // link no longer matches. Previously nothing was checked beyond the
+    // signature and a link stayed replayable until it expired.
     const user = await UsersService.getUser(decoded.user?.id);
     if (!user) return res.sendStatus(403);
-    if (user.tokenIssuedAt && (decoded.iat as number) < user.tokenIssuedAt) {
+    if (
+      !decoded.resetTokenId ||
+      !user.resetTokenId ||
+      decoded.resetTokenId !== user.resetTokenId
+    ) {
       return res.sendStatus(403);
     }
 
