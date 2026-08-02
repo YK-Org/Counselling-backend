@@ -23,6 +23,30 @@ const SIGNED_URL_TTL_SECONDS = 600;
 // this is generous enough to cover documents while bounding memory use.
 const BUFFER_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 
+// Builds a Content-Disposition header that is safe to sign and to transmit.
+//
+// Interpolating a filename directly is a trap: Node writes header values as
+// latin-1 while the SDK signs their UTF-8 form, so any non-ASCII character
+// makes the signature disagree with the bytes on the wire and R2 answers
+// SignatureDoesNotMatch. Characters above latin-1 fail even earlier, with
+// "Invalid character in header content".
+//
+// This matters for ordinary files, not exotic ones: macOS screenshots are named
+// with a narrow no-break space (U+202F) before AM/PM, and any accented name
+// trips it too.
+//
+// RFC 6266 covers exactly this — an ASCII-only `filename` for compatibility,
+// plus a percent-encoded `filename*` carrying the real name. Both are pure
+// ASCII on the wire, so signing and transmission are unambiguous.
+const contentDisposition = (originalName: string) => {
+  const ascii =
+    originalName
+      .replace(/[^\x20-\x7E]/g, "_")
+      .replace(/["\\]/g, "")
+      .trim() || "file";
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
+};
+
 // Prefixes stand in for the old Drive folders. Objects are addressed by key, so
 // the "folder" is just the first path segment.
 export type UploadType =
@@ -123,7 +147,7 @@ class StorageService {
             (lookup(file.originalname || "") as string) ||
             "application/octet-stream",
           // Drives the filename the browser uses when the signed URL is opened.
-          ContentDisposition: `inline; filename="${(file.originalname || "file").replace(/"/g, "")}"`,
+          ContentDisposition: contentDisposition(file.originalname || "file"),
         })
       );
 
