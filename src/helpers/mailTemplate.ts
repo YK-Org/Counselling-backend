@@ -1,4 +1,15 @@
-export const passwordRequestMail = (link: string) => {
+// Links now carry more than one query parameter, so the `&` has to be escaped:
+// a raw `&` in an href is invalid HTML and some email clients mangle it.
+// Renders identically to a bare `&` in both attribute and text contexts.
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+export const passwordRequestMail = (rawLink: string) => {
+  const link = escapeHtml(rawLink);
   return `
     <!DOCTYPE html>
 <html lang="en">
@@ -56,7 +67,12 @@ export const passwordRequestMail = (link: string) => {
  `;
 };
 
-export const inviteMail = (firstName: string, roleLabel: string, link: string) => {
+export const inviteMail = (
+  firstName: string,
+  roleLabel: string,
+  rawLink: string
+) => {
+  const link = escapeHtml(rawLink);
   return `
     <!DOCTYPE html>
 <html lang="en">

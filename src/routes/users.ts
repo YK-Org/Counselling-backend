@@ -140,7 +140,9 @@ const inviteUser = async (request: Request, response: Response) => {
       INVITE_TOKEN_TTL,
       { resetTokenId }
     );
-    const link = `${process.env.APP_URL}/password/reset?tok=${token.token}`;
+    // Same page as a password reset, but `invite=1` lets it greet a first-time
+    // invitee ("set your password") instead of talking about resetting one.
+    const link = `${process.env.APP_URL}/password/reset?tok=${token.token}&invite=1`;
     const roleLabel =
       user.role === "headCounsellor" ? "head counsellor" : "counsellor";
 
