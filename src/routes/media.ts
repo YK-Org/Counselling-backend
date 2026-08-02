@@ -1,5 +1,9 @@
 import express, { Request, Response } from "express";
 import StorageService from "../services/storage";
+import MediaAccessService from "../services/mediaAccess";
+import MiddlewareService from "../middleware/index";
+import { handleForbiddenError } from "../helpers/errorHandler";
+import { AuthenticatedRequest } from "../types";
 import archiver from "archiver";
 import path from "path";
 
@@ -16,6 +20,14 @@ const viewMedia = async (request: Request, response: Response) => {
 
     if (!mediaIds.length) {
       return response.status(400).json({ message: "No media requested" });
+    }
+
+    const user = (request as AuthenticatedRequest).user;
+    const permitted = await MediaAccessService.canAccessAll(user, mediaIds);
+    if (!permitted) {
+      // Same answer whether the key does not exist or is not theirs, so this
+      // cannot be used to discover which keys are real.
+      return handleForbiddenError(response);
     }
 
     if (mediaIds.length === 1) {
@@ -61,6 +73,10 @@ const viewMedia = async (request: Request, response: Response) => {
   }
 };
 
-router.put("/media", [], viewMedia);
+router.put(
+  "/media",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  viewMedia
+);
 
 export default router;
