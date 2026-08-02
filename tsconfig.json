@@ -11,7 +11,9 @@
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "rootDir": "src"
   },
+  "include": ["src"],
   "exclude": ["node_modules", "build"]
 }

@@ -6,11 +6,25 @@ import bcrypt from "bcrypt";
 import AuthService from "../services/auth";
 import { omit } from "lodash";
 import multer from "multer";
-import MediaService from "../services/media";
-import { handleError, handleValidationError, handleNotFoundError } from "../helpers/errorHandler";
+import StorageService from "../services/storage";
+import crypto from "crypto";
+import {
+  handleError,
+  handleValidationError,
+  handleNotFoundError,
+  handleConflictError,
+  handleForbiddenError,
+} from "../helpers/errorHandler";
 import { FILE_UPLOAD_LIMITS } from "../constants/counsellor-status";
 import { AuthenticatedRequest } from "../types";
-import { uploadLimiter, passwordChangeLimiter } from "../middleware/rateLimiter";
+import {
+  uploadLimiter,
+  passwordChangeLimiter,
+  inviteLimiter,
+} from "../middleware/rateLimiter";
+import { InviteUserValidation } from "../validationClasses/users/invite";
+import { inviteMail, inviteMailText } from "../helpers/mailTemplate";
+import { sendMail } from "../helpers/mailer";
 
 // Configure multer with validation
 const { PROFILE_PICTURE } = FILE_UPLOAD_LIMITS;
@@ -86,6 +100,96 @@ router.get(
   dashboardInit
 );
 
+// How long an invitee has to set their password before the link dies.
+const INVITE_TOKEN_TTL = "7d";
+
+const inviteUser = async (request: Request, response: Response) => {
+  try {
+    const { email, firstName, lastName, phoneNumber, role } = request.body;
+
+    // The invitee picks their own password via the emailed link. Until then the
+    // account is unreachable: this placeholder is random, never disclosed, and
+    // no plaintext matches its hash. Emailing a generated password instead
+    // would leave a working credential sitting in an inbox indefinitely.
+    const unusablePassword = crypto.randomBytes(32).toString("hex");
+
+    const user = await UserService.createUser({
+      email,
+      firstName,
+      lastName,
+      phoneNumber,
+      role,
+      password: unusablePassword,
+      status: "awaitingConfirmation",
+    });
+
+    const userData: any = omit(user, [
+      "password",
+      "resetTokenId",
+      "tokenIssuedAt",
+    ]);
+
+    // Reuses the password-reset token type, so the existing
+    // /forgot-password/reset endpoint and its frontend page accept the link
+    // as-is. Setting a password there flips the account to active.
+    const resetTokenId = crypto.randomUUID();
+    await UserService.updateUser({ resetTokenId }, user.id);
+
+    const token = AuthService.generateAccessToken(
+      userData,
+      "passwordReset",
+      INVITE_TOKEN_TTL,
+      { resetTokenId }
+    );
+    // Same page as a password reset, but `invite=1` lets it greet a first-time
+    // invitee ("set your password") instead of talking about resetting one.
+    const link = `${process.env.APP_URL}/password/reset?tok=${token.token}&invite=1`;
+    const roleLabel =
+      user.role === "headCounsellor" ? "head counsellor" : "counsellor";
+
+    // The account exists at this point, so a mail failure must not 500 the
+    // request — but it must not be reported as a clean success either, or the
+    // invitee is left with an account and no way to reach it.
+    let inviteEmailSent = true;
+    try {
+      await sendMail({
+        from: "Counsellor App <counsellortrinity@gmail.com>",
+        to: email,
+        subject: "You have been invited to the Counsellor App",
+        text: inviteMailText(user.firstName, roleLabel, link),
+        html: inviteMail(user.firstName, roleLabel, link),
+      });
+    } catch (mailError: any) {
+      inviteEmailSent = false;
+      console.error("inviteUser: account created but invite email failed", {
+        email,
+        message: mailError?.message,
+        code: mailError?.code,
+      });
+    }
+
+    return response.status(201).json({ ...userData, inviteEmailSent });
+  } catch (err: any) {
+    if (err?.code === "P2002") {
+      return handleConflictError(
+        response,
+        "A user with that email already exists"
+      );
+    }
+    return handleError(response, err, "inviteUser", "Failed to invite user");
+  }
+};
+
+router.post(
+  "/users",
+  [
+    inviteLimiter,
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.requestValidation(InviteUserValidation),
+  ],
+  inviteUser
+);
+
 const changePassword = async (request: Request, response: Response) => {
   try {
     const oldPassword = request.body.oldPassword;
@@ -123,6 +227,7 @@ const changePassword = async (request: Request, response: Response) => {
       const userData: any = {
         ...omit(getUser, [
           "password",
+          "resetTokenId",
           "__v",
           "createdAt",
           "updatedAt",
@@ -172,8 +277,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
       return handleValidationError(response, "No file uploaded");
     }
 
-    // Upload to Google Drive
-    const uploadedFiles = await MediaService.uploadFilesToDrive(
+    const uploadedFiles = await StorageService.uploadFiles(
       [file],
       "profile-pictures"
     );
@@ -183,10 +287,23 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
     }
 
     // Store the Google Drive file ID
+    const previous = await UserService.getUser(userId);
     await UserService.updateUser(
       { profilePicture: uploadedFiles[0].id },
       userId
     );
+
+    // Drop the superseded image. Nothing references it once the column moves
+    // on, so leaving it would accumulate orphans in Drive and on disk.
+    if (previous?.profilePicture) {
+      await StorageService.deleteFiles([previous.profilePicture]).catch(
+        (err: any) =>
+          console.error(
+            "Could not delete previous profile picture",
+            err?.message
+          )
+      );
+    }
 
     return response.status(200).json({
       message: "Profile picture uploaded successfully",
@@ -231,6 +348,7 @@ const getUserProfile = async (request: Request, response: Response) => {
 
     const userData = omit(user, [
       "password",
+      "resetTokenId",
       "__v",
       "tokenIssuedAt",
     ]);
@@ -252,6 +370,15 @@ router.get(
   getUserProfile
 );
 
+// Returns a short-lived signed URL rather than the bytes. The browser fetches
+// straight from R2, so no image passes through this server and there is no
+// cache to keep coherent. Authorization still happens here — the URL is only
+// issued to a caller already allowed to see it.
+const sendProfilePicture = async (response: Response, key: string) => {
+  const url = await StorageService.getSignedUrl(key);
+  return response.status(200).json({ url });
+};
+
 const getProfilePicture = async (request: Request, response: Response) => {
   try {
     const userId = (request as AuthenticatedRequest).user.id;
@@ -261,20 +388,7 @@ const getProfilePicture = async (request: Request, response: Response) => {
       return handleNotFoundError(response, "Profile picture not found");
     }
 
-    // Get file from Google Drive
-    const fileName = await MediaService.getFromGoogleDrive(user.profilePicture);
-
-    // Send the file
-    return response.download(fileName, "profile-picture", (err: any) => {
-      if (err) {
-        response.status(500).send("Error downloading file");
-      }
-      // Clean up the temporary file
-      const fs = require("fs");
-      fs.unlink(fileName, (unlinkErr: any) => {
-        if (unlinkErr) console.error("Error deleting temp file:", unlinkErr);
-      });
-    });
+    return await sendProfilePicture(response, user.profilePicture);
   } catch (err: any) {
     return handleError(
       response,
@@ -289,6 +403,80 @@ router.get(
   "/profile/picture",
   [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
   getProfilePicture
+);
+
+const deleteProfilePicture = async (request: Request, response: Response) => {
+  try {
+    const userId = (request as AuthenticatedRequest).user.id;
+    const user = await UserService.getUser(userId);
+
+    if (!user?.profilePicture) {
+      return handleNotFoundError(response, "No profile picture to delete");
+    }
+
+    const key = user.profilePicture;
+
+    // Clear the reference first: the column is the source of truth, and if the
+    // object delete fails afterwards the worst case is an orphaned file rather
+    // than a user pointing at an image that no longer exists.
+    await UserService.updateUser({ profilePicture: null }, userId);
+
+    await StorageService.deleteFiles([key]).catch((err: any) =>
+      console.error("Could not delete profile picture from R2", err?.message)
+    );
+
+    return response
+      .status(200)
+      .json({ message: "Profile picture removed successfully" });
+  } catch (err: any) {
+    return handleError(
+      response,
+      err,
+      "deleteProfilePicture",
+      "Failed to remove profile picture"
+    );
+  }
+};
+
+router.delete(
+  "/profile/picture",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  deleteProfilePicture
+);
+
+const getUserPicture = async (request: Request, response: Response) => {
+  try {
+    const { userId } = request.params;
+    const requester = (request as AuthenticatedRequest).user;
+
+    // Head counsellors manage everyone, so they may see any picture. Everyone
+    // else may only fetch their own — a counsellor has no reason to enumerate
+    // colleagues through this route.
+    if (requester.role !== "headCounsellor" && requester.id !== userId) {
+      return handleForbiddenError(response);
+    }
+
+    const user = await UserService.getUser(userId);
+
+    if (!user || !user.profilePicture) {
+      return handleNotFoundError(response, "Profile picture not found");
+    }
+
+    return await sendProfilePicture(response, user.profilePicture);
+  } catch (err: any) {
+    return handleError(
+      response,
+      err,
+      "getUserPicture",
+      "Failed to retrieve profile picture"
+    );
+  }
+};
+
+router.get(
+  "/users/:userId/picture",
+  [MiddlewareService.allowedRoles(["headCounsellor", "counsellor"])],
+  getUserPicture
 );
 
 export default router;

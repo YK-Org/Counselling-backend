@@ -22,7 +22,6 @@ datasource db {
 }
 
 enum UserRole {
-  admin
   headCounsellor
   counsellor
 }
@@ -49,6 +48,10 @@ model User {
   status         UserStatus @default(awaitingConfirmation)
   availability   Boolean    @default(true)
   tokenIssuedAt  Int?
+  // Nonce for the outstanding password-reset/invite link. Matched against the
+  // token's claim and cleared on use, which is what makes those links
+  // single-use — JWT `iat` is second-granular and cannot express this.
+  resetTokenId   String?
   profilePicture String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -64,6 +67,10 @@ model Couple {
   id                 String   @id @default(cuid())
   completed          Boolean  @default(false)
   counsellorAccepted String?
+  // Short code the couple types into the intake form so their answers attach
+  // to the right record. Nullable because couples registered before this
+  // existed have none, and phone matching remains as a fallback.
+  referenceCode      String?  @unique
   // Couple "letter" file reference ({ id, name })
   letterFileId       String?
   letterFileName     String?
@@ -107,6 +114,9 @@ model Partner {
   otherInfo           Json?
   churchAfterMarriage String?
   orderOfBirth        String?
+  // When this partner's intake form arrived. Null means the record is still a
+  // stub created at registration, which is what the dashboard chases up.
+  formSubmittedAt     DateTime?
 
   coupleId String?
   couple   Couple? @relation(fields: [coupleId], references: [id])

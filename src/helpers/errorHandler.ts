@@ -34,6 +34,16 @@ export const handleValidationError = (
 };
 
 /**
+ * Handles conflict errors (e.g. a uniqueness violation such as duplicate email)
+ */
+export const handleConflictError = (
+  res: Response,
+  message: string = "Resource already exists"
+) => {
+  return res.status(409).json({ message });
+};
+
+/**
  * Handles not found errors
  */
 export const handleNotFoundError = (

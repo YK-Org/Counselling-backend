@@ -1,6 +1,9 @@
 import { removeUnwantedCharacters } from "./removeUnwantedCharacters";
 
 const mapData: any = {
+  // Given to the couple when they register, so their answers attach to the
+  // right record without guessing from phone numbers.
+  ReferenceCode: "referenceCode",
   FullName: "name",
   TelNo: "phoneNumber",
   DateofBirth: "dateOfBirth",

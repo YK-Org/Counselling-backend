@@ -43,6 +43,23 @@ export const uploadLimiter = rateLimit({
 });
 
 /**
+ * Invite rate limiter
+ * Limits: 20 invites per hour per IP
+ *
+ * The endpoint is head-counsellor-only, but it sends mail to a caller-supplied
+ * address — this caps the blast radius if such an account is ever compromised.
+ */
+export const inviteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // Limit each IP to 20 invites per hour
+  message: {
+    message: "Too many invites sent, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
  * Password change rate limiter
  * Limits: 3 password changes per hour per IP
  */

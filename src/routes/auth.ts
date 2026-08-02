@@ -1,15 +1,17 @@
 import express, { Request, Response } from "express";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import AuthService from "../services/auth";
 import UserService from "../services/users";
 import { LoginValidation } from "../validationClasses/auth/login";
 import MiddlewareService from "../middleware/index";
-import { RegisterValidation } from "../validationClasses/auth/register";
-import { IRegisterResponse } from "../types/interfaces";
 import { omit } from "lodash";
 import * as jwt from "jsonwebtoken";
 import { sendMail } from "../helpers/mailer";
-import { passwordRequestMail } from "../helpers/mailTemplate";
+import {
+  passwordRequestMail,
+  passwordRequestMailText,
+} from "../helpers/mailTemplate";
 import { authLimiter } from "../middleware/rateLimiter";
 
 const router = express.Router();
@@ -27,6 +29,7 @@ const login = async (request: Request, response: Response) => {
       const userData: any = {
         ...omit(user[0], [
           "password",
+          "resetTokenId",
           "__v",
           "createdAt",
           "updatedAt",
@@ -59,64 +62,9 @@ router.post(
   login
 );
 
-const register = async (request: Request, response: Response) => {
-  try {
-    const { email } = request.body;
-
-    const oldUser = await UserService.getUsers({ email });
-
-    if (oldUser && oldUser.length) {
-      return response.status(409).send("User Already Exists");
-    }
-
-    // Public registration must never allow a client to self-assign a
-    // privileged role. Force the role server-side regardless of input.
-    // Elevated roles (headCounsellor/admin) are granted through
-    // authenticated admin flows, not this endpoint.
-    const user = await UserService.createUser({
-      ...request.body,
-      role: "counsellor",
-    });
-
-    if (!user) {
-      return response.status(400).send("Unable to create user");
-    }
-
-    // Build the sanitized user BEFORE signing the token — otherwise the
-    // password hash ends up embedded in the (client-readable) JWT payload.
-    const userData: any = omit(user, [
-      "password",
-      "__v",
-      "createdAt",
-      "updatedAt",
-    ]);
-
-    const token = AuthService.generateAccessToken(userData);
-
-    await UserService.updateUser(
-      {
-        tokenIssuedAt: token.issuedAt,
-      },
-      user.id
-    );
-
-    const data: IRegisterResponse = {
-      user: userData,
-      token: token.token,
-    };
-
-    return response.status(201).json(data);
-  } catch (err: any) {
-    console.error(err);
-    return response.status(500).send("Failed to register user");
-  }
-};
-
-router.post(
-  "/register",
-  [MiddlewareService.requestValidation(RegisterValidation)],
-  register
-);
+// Public self-registration was removed: every account in this app is staff, so
+// accounts are created by a head counsellor via POST /api/v1/users, and the
+// very first one by `npm run prisma:seed`.
 
 const authCheck = async (request: Request, response: Response) => {
   try {
@@ -132,6 +80,7 @@ const authCheck = async (request: Request, response: Response) => {
     const data = {
       ...omit(decoded.user, [
         "password",
+        "resetTokenId",
         "__v",
         "createdAt",
         "updatedAt",
@@ -155,15 +104,21 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
       const userData: any = {
         ...omit(user[0], [
           "password",
+          "resetTokenId",
           "__v",
           "createdAt",
           "updatedAt",
         ]),
       };
+      // Minting a new link invalidates any previous outstanding one.
+      const resetTokenId = crypto.randomUUID();
+      await UserService.updateUser({ resetTokenId }, user[0].id);
+
       const token = AuthService.generateAccessToken(
         userData,
         "passwordReset",
-        "900s"
+        "900s",
+        { resetTokenId }
       );
       const link = `${process.env.APP_URL}/password/reset?tok=${token.token}`;
 
@@ -171,10 +126,24 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
         from: "Counsellor App <counsellortrinity@gmail.com>",
         to: email,
         subject: "Password Reset",
-        text: "",
+        text: passwordRequestMailText(link),
         html: passwordRequestMail(link),
       };
-      await sendMail(mailOptions);
+      // Unlike the other senders there is nothing useful to return on failure:
+      // the whole point of the request is the email, so say it did not arrive
+      // rather than returning 200 and leaving the user waiting for it.
+      try {
+        await sendMail(mailOptions);
+      } catch (mailError: any) {
+        console.error("forgotPasswordRequest: failed to send reset email", {
+          email,
+          message: mailError?.message,
+          code: mailError?.code,
+        });
+        return response
+          .status(500)
+          .json({ message: "Could not send the reset email. Please try again." });
+      }
     } else {
       throw new Error("User cannot be found");
     }
@@ -192,13 +161,25 @@ const forgotPasswordReset = async (request: Request, response: Response) => {
     const password = request.body.password;
     const id = (request as any).user.id;
     const encryptedUserPassword = await bcrypt.hash(password, 10);
+
+    // Consuming an invite link is what activates the account — setting a
+    // password is the confirmation. Only awaitingConfirmation is promoted, so
+    // a banned user cannot reinstate themselves via password reset.
+    const existing = await UserService.getUser(id);
+    const activates = existing?.status === "awaitingConfirmation";
+
     const user = await UserService.updateUser(
-      { password: encryptedUserPassword },
+      {
+        password: encryptedUserPassword,
+        // Spend the link — it must not work a second time.
+        resetTokenId: null,
+        ...(activates ? { status: "active" } : {}),
+      },
       id
     );
     if (user) {
       const userData: any = {
-        ...omit(user, ["password", "__v", "createdAt", "updatedAt"]),
+        ...omit(user, ["password","resetTokenId", "__v", "createdAt", "updatedAt"]),
       };
       const token = AuthService.generateAccessToken(userData);
       const data = {

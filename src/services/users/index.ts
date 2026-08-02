@@ -17,24 +17,22 @@ const shapeCounsellor = (counsellor: any) => {
 };
 
 class UserService {
+  // Throws on failure — notably Prisma's P2002 for a duplicate email, which
+  // callers map to a 409. Swallowing it here turned every cause into an
+  // indistinguishable "unable to create user".
   async createUser(data: Partial<IUser>) {
-    try {
-      const password = await bcrypt.hash(data.password as string, 10);
-      const response = await prisma.user.create({
-        data: {
-          email: data.email as string,
-          firstName: data.firstName as string,
-          lastName: data.lastName as string,
-          password,
-          phoneNumber: data.phoneNumber,
-          role: (data.role as any) || "counsellor",
-          ...(data.status ? { status: data.status as any } : {}),
-        },
-      });
-      return response;
-    } catch (e: any) {
-      // Preserve previous behaviour: swallow create errors and return undefined.
-    }
+    const password = await bcrypt.hash(data.password as string, 10);
+    return prisma.user.create({
+      data: {
+        email: data.email as string,
+        firstName: data.firstName as string,
+        lastName: data.lastName as string,
+        password,
+        phoneNumber: data.phoneNumber,
+        role: (data.role as any) || "counsellor",
+        ...(data.status ? { status: data.status as any } : {}),
+      },
+    });
   }
 
   async updateUser(data: any, id: string) {
@@ -130,26 +128,6 @@ class UserService {
             { lastName: { contains: search, mode: "insensitive" } },
             { firstName: { contains: search, mode: "insensitive" } },
           ],
-        },
-      });
-      return response;
-    } catch (e: any) {
-      throw new Error(e.message);
-    }
-  }
-
-  async createCounsellor(data: Partial<IUser>) {
-    try {
-      const password = await bcrypt.hash(data.password as string, 10);
-      const response = await prisma.user.create({
-        data: {
-          email: data.email as string,
-          firstName: data.firstName as string,
-          lastName: data.lastName as string,
-          password,
-          phoneNumber: data.phoneNumber,
-          role: "counsellor",
-          status: "active",
         },
       });
       return response;

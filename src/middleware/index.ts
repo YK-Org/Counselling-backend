@@ -9,12 +9,14 @@ import { JwtPayload } from "jsonwebtoken";
 
 class MiddlewareService {
   checkAuthentication = async (req: any, res: Response, next: any) => {
+    // Only endpoints filled in by counsellees, who have no account. POST
+    // /couples was here too, but it registers a couple from the dashboard and
+    // the frontend already sends a token — leaving it open let anyone create
+    // couples, and now mint reference codes.
     const unauthRoutes = [
-      "/api/v1/couples",
       "/api/v1/forgot-password/request",
       "/api/v1/login",
       "/api/v1/forgot-password/reset",
-      "/api/v1/register",
       "/api/v1/couples/details",
       "/api/v1/questionnaire/pre-test",
       "/api/v1/questionnaire/post-test",
@@ -117,23 +119,42 @@ class MiddlewareService {
     };
   }
 
-  checkPasswordReset = (req: any, res: Response, next: any) => {
+  checkPasswordReset = async (req: any, res: Response, next: any) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
     if (token == null) return res.sendStatus(401);
-    jwt.verify(
-      token,
-      process.env.TOKEN_SECRET as string,
-      (err: any, decoded: any) => {
-        if (err) return res.sendStatus(403);
-        if (decoded.tokenType !== "passwordReset") {
-          return res.sendStatus(401);
-        }
-        req.user = decoded.user;
 
-        return next();
-      }
-    );
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.TOKEN_SECRET as string
+      ) as JwtPayload;
+    } catch (err) {
+      return res.sendStatus(403);
+    }
+
+    if (decoded.tokenType !== "passwordReset") {
+      return res.sendStatus(401);
+    }
+
+    // Single-use: the link carries a nonce that is stored on the user when the
+    // link is minted and cleared once it is spent, so a spent or superseded
+    // link no longer matches. Previously nothing was checked beyond the
+    // signature and a link stayed replayable until it expired.
+    const user = await UsersService.getUser(decoded.user?.id);
+    if (!user) return res.sendStatus(403);
+    if (
+      !decoded.resetTokenId ||
+      !user.resetTokenId ||
+      decoded.resetTokenId !== user.resetTokenId
+    ) {
+      return res.sendStatus(403);
+    }
+
+    req.user = decoded.user;
+
+    return next();
   };
 }
 

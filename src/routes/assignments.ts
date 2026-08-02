@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import AssignmentsService from "../services/assignments";
-import MediaService from "../services/media";
+import StorageService from "../services/storage";
 import MiddlewareService from "../middleware/index";
 import multer from "multer";
 const upload = multer({ dest: "uploads/assignments/" });
@@ -12,8 +12,8 @@ const addAssignments = async (request: Request, response: Response) => {
     const body = request.body;
     let uploadedFiles: { id: string; name: string }[] = [];
     if (request.files) {
-      uploadedFiles = await MediaService.uploadFilesToDrive(
-        request.files,
+      uploadedFiles = await StorageService.uploadFiles(
+        request.files as any[],
         "assignments"
       );
     }
@@ -41,7 +41,7 @@ const deleteAssignments = async (request: Request, response: Response) => {
     const assignment = await AssignmentsService.getAssignment({ id: assignmentsId });
     const uploads = (assignment?.uploads as { id: string; name: string }[]) || [];
     if (uploads.length) {
-      await MediaService.deleteFilesInDrive(uploads);
+      await StorageService.deleteFiles(uploads.map((upload) => upload.id));
     }
     await AssignmentsService.deleteAssignment(assignmentsId);
     return response.status(201).json({});

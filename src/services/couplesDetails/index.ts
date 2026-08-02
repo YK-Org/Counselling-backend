@@ -1,6 +1,6 @@
 import prisma from "../../prisma/client";
 import { ICouplesDetails } from "../../types/models/CouplesDetails";
-import { parsePhoneNumber } from "awesome-phonenumber";
+import { toE164 } from "../../helpers/phoneNumber";
 
 // Scalar columns on the Partner table (vs. the jsonb history groups below).
 const COLUMN_KEYS = [
@@ -57,8 +57,7 @@ const deepMerge = (target: any, source: any): any => {
   return out;
 };
 
-const toE164 = (phoneNumber?: string) =>
-  (phoneNumber && parsePhoneNumber(phoneNumber).number?.e164) || phoneNumber;
+
 
 class CouplesDetailsService {
   async createDetails(data: Partial<ICouplesDetails>) {
@@ -71,6 +70,48 @@ class CouplesDetailsService {
         },
       });
       return response;
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  // Merges a submission into one specific partner record. Used when a
+  // reference code has already told us exactly which slot this belongs to, so
+  // no matching is involved and a shared or mistyped phone cannot misdirect it.
+  async updateDetailsForPartner(partnerId: string, data: any) {
+    try {
+      const nested = expandDotKeys(data);
+
+      const existing = await prisma.partner.findUnique({
+        where: { id: partnerId },
+      });
+      if (!existing) return null;
+
+      const columns: any = {};
+      for (const key of COLUMN_KEYS) {
+        if (key in nested) columns[key] = nested[key];
+      }
+      if (columns.phoneNumber) columns.phoneNumber = toE164(columns.phoneNumber);
+      if (typeof columns.dateOfBirth === "string") {
+        const d = new Date(columns.dateOfBirth);
+        if (isNaN(d.getTime())) delete columns.dateOfBirth;
+        else columns.dateOfBirth = d;
+      }
+
+      const jsonData: any = {};
+      for (const key of JSON_KEYS) {
+        if (key in nested) {
+          const prev = (existing as any)[key];
+          jsonData[key] = isPlainObject(prev)
+            ? deepMerge(prev, nested[key])
+            : nested[key];
+        }
+      }
+
+      return await prisma.partner.update({
+        where: { id: partnerId },
+        data: { ...columns, ...jsonData, formSubmittedAt: new Date() },
+      });
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -109,7 +150,7 @@ class CouplesDetailsService {
         }
       }
 
-      const writeData = { ...columns, ...jsonData };
+      const writeData = { ...columns, ...jsonData, formSubmittedAt: new Date() };
 
       if (existing) {
         return await prisma.partner.update({

@@ -3,3 +3,6 @@ dist
 coverage
 .env
 build
+# Multer scratch space and the profile-picture cache — regenerated at runtime,
+# and both directories are created on demand.
+uploads
