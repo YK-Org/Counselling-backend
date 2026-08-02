@@ -56,6 +56,14 @@ class StorageService {
       region: "auto",
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: { accessKeyId, secretAccessKey },
+      // Recent AWS SDK versions add a streaming CRC32 trailer by default,
+      // which sends the body as `aws-chunked` and signs it as
+      // STREAMING-UNSIGNED-PAYLOAD-TRAILER. R2 verifies that inconsistently
+      // and intermittently rejects the request with SignatureDoesNotMatch.
+      // Neither setting weakens transport security — the request is still
+      // SigV4-signed over TLS; only the redundant payload checksum is dropped.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
 
     return this.client;
@@ -84,11 +92,19 @@ class StorageService {
     for (const file of files) {
       const key = this.buildKey(uploadType, file.originalname || file.filename);
 
+      // Multer reports the size; without it the SDK cannot length-prefix the
+      // body and falls back to chunked transfer, which is the fragile path.
+      const size =
+        typeof file.size === "number"
+          ? file.size
+          : (await fs.stat(file.path)).size;
+
       await this.getClient().send(
         new PutObjectCommand({
           Bucket: this.bucket(),
           Key: key,
           Body: createReadStream(file.path),
+          ContentLength: size,
           ContentType:
             file.mimetype ||
             (lookup(file.originalname || "") as string) ||
