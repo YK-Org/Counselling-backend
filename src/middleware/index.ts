@@ -117,23 +117,39 @@ class MiddlewareService {
     };
   }
 
-  checkPasswordReset = (req: any, res: Response, next: any) => {
+  checkPasswordReset = async (req: any, res: Response, next: any) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
     if (token == null) return res.sendStatus(401);
-    jwt.verify(
-      token,
-      process.env.TOKEN_SECRET as string,
-      (err: any, decoded: any) => {
-        if (err) return res.sendStatus(403);
-        if (decoded.tokenType !== "passwordReset") {
-          return res.sendStatus(401);
-        }
-        req.user = decoded.user;
 
-        return next();
-      }
-    );
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.TOKEN_SECRET as string
+      ) as JwtPayload;
+    } catch (err) {
+      return res.sendStatus(403);
+    }
+
+    if (decoded.tokenType !== "passwordReset") {
+      return res.sendStatus(401);
+    }
+
+    // Single-use: consuming a reset/invite link bumps the user's tokenIssuedAt
+    // (see forgotPasswordReset), so an already-spent link now predates it and
+    // is refused. Without this a link stayed replayable until it expired —
+    // harmless-ish at the 15m reset TTL, but invites live for days.
+    // Comparison is second-granular because that is JWT `iat`'s resolution.
+    const user = await UsersService.getUser(decoded.user?.id);
+    if (!user) return res.sendStatus(403);
+    if (user.tokenIssuedAt && (decoded.iat as number) < user.tokenIssuedAt) {
+      return res.sendStatus(403);
+    }
+
+    req.user = decoded.user;
+
+    return next();
   };
 }
 

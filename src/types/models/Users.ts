@@ -3,8 +3,8 @@
 // the rest of the codebase imports. The persistence layer now lives in Prisma
 // (see prisma/schema.prisma and src/prisma/client.ts).
 
-export type IUserRole = "admin" | "headCounsellor" | "counsellor";
-export const userRoles = ["admin", "headCounsellor", "counsellor"];
+export type IUserRole = "headCounsellor" | "counsellor";
+export const userRoles = ["headCounsellor", "counsellor"];
 
 export type IUserStatus = "active" | "banned" | "awaitingConfirmation";
 export const userStatus = ["active", "banned", "awaitingConfirmation"];

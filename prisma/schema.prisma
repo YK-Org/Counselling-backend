@@ -22,7 +22,6 @@ datasource db {
 }
 
 enum UserRole {
-  admin
   headCounsellor
   counsellor
 }
