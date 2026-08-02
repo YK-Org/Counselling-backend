@@ -3,6 +3,7 @@ import { transformFormData } from "../helpers/transformFormData";
 import { normaliseReferenceCode } from "../helpers/referenceCode";
 import { toE164 } from "../helpers/phoneNumber";
 import { handleError, handleValidationError } from "../helpers/errorHandler";
+import { requireFormSecret } from "../middleware/formSubmission";
 import CouplesDetailsService from "../services/couplesDetails";
 import CouplesService from "../services/couples";
 import { get } from "lodash";
@@ -56,7 +57,14 @@ const addCouples = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/couples", [upload.single("file")], addCouples);
+router.post(
+  "/couples",
+  [
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    upload.single("file"),
+  ],
+  addCouples
+);
 
 // Chooses which partner record in a couple a submission belongs to. Phone
 // first because it is the strongest signal available, then gender, then any
@@ -164,7 +172,7 @@ const addCouplesDetails = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/couples/details", [], addCouplesDetails);
+router.post("/couples/details", [requireFormSecret], addCouplesDetails);
 
 // Everything still waiting to be resolved by a person: submissions that could
 // not be attached to any couple, and couples where a partner has not sent

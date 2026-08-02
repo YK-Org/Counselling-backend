@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import QuestionnaireService from "../services/questionnaire";
 import { omit } from "lodash";
 import MiddlewareService from "../middleware/index";
+import { requireFormSecret } from "../middleware/formSubmission";
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ const preTest = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/questionnaire/pre-test", [], preTest);
+router.post("/questionnaire/pre-test", [requireFormSecret], preTest);
 
 const postTest = async (request: Request, response: Response) => {
   try {
@@ -47,7 +48,7 @@ const postTest = async (request: Request, response: Response) => {
   }
 };
 
-router.post("/questionnaire/post-test", [], postTest);
+router.post("/questionnaire/post-test", [requireFormSecret], postTest);
 
 const getQuestionnaire = async (request: Request, response: Response) => {
   try {

@@ -9,8 +9,11 @@ import { JwtPayload } from "jsonwebtoken";
 
 class MiddlewareService {
   checkAuthentication = async (req: any, res: Response, next: any) => {
+    // Only endpoints filled in by counsellees, who have no account. POST
+    // /couples was here too, but it registers a couple from the dashboard and
+    // the frontend already sends a token — leaving it open let anyone create
+    // couples, and now mint reference codes.
     const unauthRoutes = [
-      "/api/v1/couples",
       "/api/v1/forgot-password/request",
       "/api/v1/login",
       "/api/v1/forgot-password/reset",
