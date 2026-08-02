@@ -22,7 +22,7 @@ import {
   inviteLimiter,
 } from "../middleware/rateLimiter";
 import { InviteUserValidation } from "../validationClasses/users/invite";
-import { inviteMail } from "../helpers/mailTemplate";
+import { inviteMail, inviteMailText } from "../helpers/mailTemplate";
 import { sendMail } from "../helpers/mailer";
 
 // Configure multer with validation
@@ -146,15 +146,28 @@ const inviteUser = async (request: Request, response: Response) => {
     const roleLabel =
       user.role === "headCounsellor" ? "head counsellor" : "counsellor";
 
-    await sendMail({
-      from: "Counsellor App <counsellortrinity@gmail.com>",
-      to: email,
-      subject: "You have been invited to the Counsellor App",
-      text: "",
-      html: inviteMail(user.firstName, roleLabel, link),
-    });
+    // The account exists at this point, so a mail failure must not 500 the
+    // request — but it must not be reported as a clean success either, or the
+    // invitee is left with an account and no way to reach it.
+    let inviteEmailSent = true;
+    try {
+      await sendMail({
+        from: "Counsellor App <counsellortrinity@gmail.com>",
+        to: email,
+        subject: "You have been invited to the Counsellor App",
+        text: inviteMailText(user.firstName, roleLabel, link),
+        html: inviteMail(user.firstName, roleLabel, link),
+      });
+    } catch (mailError: any) {
+      inviteEmailSent = false;
+      console.error("inviteUser: account created but invite email failed", {
+        email,
+        message: mailError?.message,
+        code: mailError?.code,
+      });
+    }
 
-    return response.status(201).json(userData);
+    return response.status(201).json({ ...userData, inviteEmailSent });
   } catch (err: any) {
     if (err?.code === "P2002") {
       return handleConflictError(

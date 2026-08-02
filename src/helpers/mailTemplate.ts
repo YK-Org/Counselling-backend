@@ -67,6 +67,37 @@ export const passwordRequestMail = (rawLink: string) => {
  `;
 };
 
+// Every message below has a plain-text counterpart. Sending `text: ""` with an
+// HTML-only body is a well-known spam signal — spam filters expect a
+// multipart/alternative message with a real text part.
+export const inviteMailText = (
+  firstName: string,
+  roleLabel: string,
+  link: string
+) =>
+  `Hello ${firstName},
+
+An account has been created for you on the Counsellor App as a ${roleLabel}.
+
+To choose your password and activate your account, open this link:
+${link}
+
+This link expires in 7 days and can only be used once.
+
+Thank you,
+Counsellor App`;
+
+export const passwordRequestMailText = (link: string) =>
+  `Hello,
+
+We received a request to reset your password. If you did not make this request, you can ignore this email.
+
+To reset your password, open this link:
+${link}
+
+Thank you,
+Counsellor App`;
+
 export const inviteMail = (
   firstName: string,
   roleLabel: string,

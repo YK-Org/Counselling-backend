@@ -8,7 +8,10 @@ import MiddlewareService from "../middleware/index";
 import { omit } from "lodash";
 import * as jwt from "jsonwebtoken";
 import { sendMail } from "../helpers/mailer";
-import { passwordRequestMail } from "../helpers/mailTemplate";
+import {
+  passwordRequestMail,
+  passwordRequestMailText,
+} from "../helpers/mailTemplate";
 import { authLimiter } from "../middleware/rateLimiter";
 
 const router = express.Router();
@@ -123,10 +126,24 @@ const forgotPasswordRequest = async (request: Request, response: Response) => {
         from: "Counsellor App <counsellortrinity@gmail.com>",
         to: email,
         subject: "Password Reset",
-        text: "",
+        text: passwordRequestMailText(link),
         html: passwordRequestMail(link),
       };
-      await sendMail(mailOptions);
+      // Unlike the other senders there is nothing useful to return on failure:
+      // the whole point of the request is the email, so say it did not arrive
+      // rather than returning 200 and leaving the user waiting for it.
+      try {
+        await sendMail(mailOptions);
+      } catch (mailError: any) {
+        console.error("forgotPasswordRequest: failed to send reset email", {
+          email,
+          message: mailError?.message,
+          code: mailError?.code,
+        });
+        return response
+          .status(500)
+          .json({ message: "Could not send the reset email. Please try again." });
+      }
     } else {
       throw new Error("User cannot be found");
     }

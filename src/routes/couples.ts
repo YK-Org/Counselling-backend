@@ -136,8 +136,21 @@ const assignCounsellor = async (request: Request, response: Response) => {
       text: "",
       html: assignCounsellorMail({ name1, name2 }, link),
     };
-    await sendMail(mailOptions);
-    return response.status(200).json(data);
+    // The assignment is already persisted — failing the request here would
+    // report a rollback that did not happen. Surface it in the payload instead.
+    let notificationSent = true;
+    try {
+      await sendMail(mailOptions);
+    } catch (mailError: any) {
+      notificationSent = false;
+      console.error("assignCounsellor: assignment saved but email failed", {
+        to: counsellor?.email,
+        message: mailError?.message,
+        code: mailError?.code,
+      });
+    }
+
+    return response.status(200).json({ ...data, notificationSent });
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
   }
