@@ -5,7 +5,7 @@ import CouplesService from "../services/couples";
 import { get } from "lodash";
 import { getIO } from "../socket";
 import LessonsService from "../services/lessons";
-import MediaService from "../services/media";
+import StorageService from "../services/storage";
 import MiddlewareService from "../middleware/index";
 import multer from "multer";
 import { assignCounsellorMail } from "../helpers/mailTemplate";
@@ -21,7 +21,7 @@ const addCouples = async (request: Request, response: Response) => {
     let uploadedFiles: { id: string; name: string }[] = [];
 
     if (request.file) {
-      uploadedFiles = await MediaService.uploadFilesToDrive(
+      uploadedFiles = await StorageService.uploadFiles(
         [request.file],
         "letters"
       );

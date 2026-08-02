@@ -6,10 +6,8 @@ import bcrypt from "bcrypt";
 import AuthService from "../services/auth";
 import { omit } from "lodash";
 import multer from "multer";
-import MediaService from "../services/media";
+import StorageService from "../services/storage";
 import crypto from "crypto";
-import path from "path";
-import { lookup } from "mime-types";
 import {
   handleError,
   handleValidationError,
@@ -279,8 +277,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
       return handleValidationError(response, "No file uploaded");
     }
 
-    // Upload to Google Drive
-    const uploadedFiles = await MediaService.uploadFilesToDrive(
+    const uploadedFiles = await StorageService.uploadFiles(
       [file],
       "profile-pictures"
     );
@@ -299,12 +296,13 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
     // Drop the superseded image. Nothing references it once the column moves
     // on, so leaving it would accumulate orphans in Drive and on disk.
     if (previous?.profilePicture) {
-      await MediaService.deleteFilesInDrive([
-        { id: previous.profilePicture },
-      ]).catch((err: any) =>
-        console.error("Could not delete previous profile picture", err?.message)
+      await StorageService.deleteFiles([previous.profilePicture]).catch(
+        (err: any) =>
+          console.error(
+            "Could not delete previous profile picture",
+            err?.message
+          )
       );
-      await MediaService.evictCachedProfilePicture(previous.profilePicture);
     }
 
     return response.status(200).json({
@@ -372,32 +370,13 @@ router.get(
   getUserProfile
 );
 
-// Serves a picture from the on-disk cache. The Drive file id is immutable, so
-// it works as a strong ETag: a client holding the current id never needs the
-// bytes again, and a changed picture has a different id and misses the cache.
-const sendProfilePicture = async (
-  request: Request,
-  response: Response,
-  fileId: string
-) => {
-  const etag = `"${fileId}"`;
-
-  if (request.headers["if-none-match"] === etag) {
-    return response.status(304).end();
-  }
-
-  const filePath = await MediaService.getCachedProfilePicture(fileId);
-
-  response.setHeader("ETag", etag);
-  // Private: these sit behind authentication and must not land in a shared
-  // cache. Revalidation is cheap because the ETag never changes for an id.
-  response.setHeader("Cache-Control", "private, max-age=86400");
-  response.setHeader(
-    "Content-Type",
-    (lookup(filePath) as string) || "application/octet-stream"
-  );
-
-  return response.sendFile(path.resolve(filePath));
+// Returns a short-lived signed URL rather than the bytes. The browser fetches
+// straight from R2, so no image passes through this server and there is no
+// cache to keep coherent. Authorization still happens here — the URL is only
+// issued to a caller already allowed to see it.
+const sendProfilePicture = async (response: Response, key: string) => {
+  const url = await StorageService.getSignedUrl(key);
+  return response.status(200).json({ url });
 };
 
 const getProfilePicture = async (request: Request, response: Response) => {
@@ -409,7 +388,7 @@ const getProfilePicture = async (request: Request, response: Response) => {
       return handleNotFoundError(response, "Profile picture not found");
     }
 
-    return await sendProfilePicture(request, response, user.profilePicture);
+    return await sendProfilePicture(response, user.profilePicture);
   } catch (err: any) {
     return handleError(
       response,
@@ -435,17 +414,16 @@ const deleteProfilePicture = async (request: Request, response: Response) => {
       return handleNotFoundError(response, "No profile picture to delete");
     }
 
-    const fileId = user.profilePicture;
+    const key = user.profilePicture;
 
     // Clear the reference first: the column is the source of truth, and if the
-    // Drive delete fails afterwards the worst case is an orphaned file rather
+    // object delete fails afterwards the worst case is an orphaned file rather
     // than a user pointing at an image that no longer exists.
     await UserService.updateUser({ profilePicture: null }, userId);
 
-    await MediaService.deleteFilesInDrive([{ id: fileId }]).catch((err: any) =>
-      console.error("Could not delete profile picture from Drive", err?.message)
+    await StorageService.deleteFiles([key]).catch((err: any) =>
+      console.error("Could not delete profile picture from R2", err?.message)
     );
-    await MediaService.evictCachedProfilePicture(fileId);
 
     return response
       .status(200)
@@ -484,7 +462,7 @@ const getUserPicture = async (request: Request, response: Response) => {
       return handleNotFoundError(response, "Profile picture not found");
     }
 
-    return await sendProfilePicture(request, response, user.profilePicture);
+    return await sendProfilePicture(response, user.profilePicture);
   } catch (err: any) {
     return handleError(
       response,

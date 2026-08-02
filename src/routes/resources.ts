@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import ResourcesService from "../services/resources";
 import MiddlewareService from "../middleware/index";
-import MediaService from "../services/media";
+import StorageService from "../services/storage";
 import multer from "multer";
 const upload = multer({ dest: "uploads/resources/" });
 const router = express.Router();
@@ -11,8 +11,8 @@ const addResources = async (request: Request, response: Response) => {
     const body = request.body;
     let uploadedFiles: { id: string; name: string }[] = [];
     if (request.files) {
-      uploadedFiles = await MediaService.uploadFilesToDrive(
-        request.files,
+      uploadedFiles = await StorageService.uploadFiles(
+        request.files as any[],
         "resources"
       );
     }
@@ -53,7 +53,7 @@ const deleteResources = async (request: Request, response: Response) => {
     const lesson = await ResourcesService.getLesson({ id: resourcesId });
     const uploads = (lesson?.uploads as { id: string; name: string }[]) || [];
     if (uploads.length) {
-      await MediaService.deleteFilesInDrive(uploads);
+      await StorageService.deleteFiles(uploads.map((upload) => upload.id));
     }
     await ResourcesService.deleteLesson(resourcesId);
     return response.status(201).json({});
