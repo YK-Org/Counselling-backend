@@ -10,7 +10,7 @@
 //   if you prefer.
 // - `lessonsCompleted` (embedded array on Couple) becomes the CoupleLessonCompleted
 //   join table, so "completed lessons" reporting is a plain JOIN/COUNT.
-// - Google Drive upload refs ({ id, name }) are stored as Json.
+// - Upload refs ({ id, name }) are stored as Json; `id` is the storage key.
 
 generator client {
   provider = "prisma-client-js"

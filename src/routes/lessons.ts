@@ -1,7 +1,6 @@
 import express, { Request, Response } from "express";
 import LessonsService from "../services/lessons";
 import MiddlewareService from "../middleware/index";
-import MediaService from "../services/media";
 import multer from "multer";
 const upload = multer({ dest: "uploads/lessons/" });
 const router = express.Router();

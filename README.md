@@ -102,19 +102,10 @@ browser loads directly from R2 — no image passes through this server. The
 `/media` download endpoint streams from R2 instead, because a multi-file request
 is zipped on the fly and no such object exists to sign.
 
-### Migrating from Google Drive
-
-An earlier version stored files in Google Drive. To move existing data:
-
-```bash
-npm run migrate:r2 -- --dry-run   # report what would move
-npm run migrate:r2                # copy files and rewrite references
-```
-
-It is idempotent — references that already look like R2 keys are skipped, so an
-interrupted run can be restarted. It deletes nothing from Drive; verify
-downloads first, then remove the `PROJECT_ID`/`PRIVATE_KEY`/`CLIENT_EMAIL`/
-`*_FOLDER_ID` variables and the Drive code.
+An earlier version stored files in Google Drive. That code and its one-off
+migration script have been removed; if a deployment still holds Drive file ids,
+recover `scripts/migrate-drive-to-r2.ts` from git history (last present in
+`132897d`) and run it before deploying.
 
 ## Prisma
 
