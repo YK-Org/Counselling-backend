@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { transformFormData } from "../helpers/transformFormData";
 import { normaliseReferenceCode } from "../helpers/referenceCode";
 import { toE164 } from "../helpers/phoneNumber";
+import { buildIntakeFormLink } from "../helpers/intakeForm";
 import { handleError, handleValidationError } from "../helpers/errorHandler";
 import { requireFormSecret } from "../middleware/formSubmission";
 import CouplesDetailsService from "../services/couplesDetails";
@@ -47,11 +48,13 @@ const addCouples = async (request: Request, response: Response) => {
     const ids = partners.map((result: any) => result.value.id);
     const couple = await CouplesService.createPartner(ids, uploadedFiles[0]);
     const data = await CouplesService.getCouple({ id: couple.id });
-    // The reference code is the point of this response — both partners need it
-    // to fill in the intake form.
-    return response
-      .status(201)
-      .json({ ...data, referenceCode: couple.referenceCode });
+    // The code and its prefilled link are the point of this response — both
+    // partners need one or the other to fill in the intake form.
+    return response.status(201).json({
+      ...data,
+      referenceCode: couple.referenceCode,
+      formLink: buildIntakeFormLink(couple.referenceCode),
+    });
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
   }
@@ -186,7 +189,15 @@ const outstandingSubmissions = async (
       CouplesService.getUnmatchedSubmissions(),
       CouplesService.getCouplesAwaitingForms(),
     ]);
-    return response.status(200).json({ unmatched, awaitingForms });
+    return response.status(200).json({
+      unmatched,
+      // Chasing up a missing form is the main reason to look at this list, so
+      // the link to send them comes with it.
+      awaitingForms: awaitingForms.map((couple) => ({
+        ...couple,
+        formLink: buildIntakeFormLink(couple.referenceCode),
+      })),
+    });
   } catch (err: any) {
     return handleError(
       response,
