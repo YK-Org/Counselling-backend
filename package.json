@@ -9,6 +9,7 @@
     "build:watch": "rimraf ./build && tsc --watch",
     "build": "prisma generate && rimraf ./build && tsc",
     "start": "npm run build && node build/index.js",
+    "start:prod": "prisma migrate deploy && node build/index.js",
     "postinstall": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

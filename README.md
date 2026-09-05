@@ -2,7 +2,7 @@
 
 A backend system built with **Node.js**, **Express**, and **PostgreSQL**, designed to help counsellors manage their counsellees and enable head counsellors to oversee all counselling activities.
 
-The app includes secure data management, Google Drive integration for file storage, and role-based access control for counsellors and head counsellors.
+The app includes secure data management, Cloudflare R2 for file storage, and role-based access control for counsellors and head counsellors.
 
 ---
 
@@ -12,7 +12,7 @@ The app includes secure data management, Google Drive integration for file stora
 | ----------------- | ------------------------- |
 | Backend Framework | Node.js + Express         |
 | Database          | PostgreSQL (Prisma ORM)   |
-| File Storage      | Google Drive API          |
+| File Storage      | Cloudflare R2 (S3 API)    |
 | Authentication    | JWT                       |
 
 ---
@@ -116,3 +116,64 @@ recover `scripts/migrate-drive-to-r2.ts` from git history (last present in
 Deeply-nested partner history (education, profession, parents, `otherInfo`, …)
 is stored in `jsonb` columns on the `Partner` table; frequently-queried fields
 (name, phone, gender, date of birth) are promoted to real, indexed columns.
+
+---
+
+## Deployment
+
+### Settings that are easy to miss
+
+| Variable | Why it matters |
+| --- | --- |
+| `FORM_SHARED_SECRET` | Until it is set, `/couples/details` and both questionnaire endpoints accept writes from **anyone** who finds the URL. A warning is logged on every such request. |
+| `TRUST_PROXY` | Set to `1` behind any reverse proxy or managed host. Without it every request appears to come from the proxy, and the rate limiters throttle all users as though they were one client. |
+| `CORS_ORIGINS` / `APP_URL` | Restricts which browser origins may call the API and open a socket. If neither is set, every origin is allowed. |
+| `EMAIL` + `GOOGLE_APP_PASSWORD` | Invites and password resets are emailed. Without these, inviting a counsellor creates an account nobody can sign in to. |
+| `TOKEN_SECRET` | Rotating it signs out every user immediately. Generate a long random value; never reuse the development one. |
+
+Turning on the form secret has an order to it. The endpoints fail **open**, so
+deploying this code cannot take a live Google Form offline — but that also
+means the protection is off until you finish the sequence:
+
+1. Add the header to the Form's Apps Script:
+   `'X-Form-Secret': '<the value>'`
+2. Deploy the Apps Script and submit one test response.
+3. Only then set `FORM_SHARED_SECRET` on the server and restart.
+
+Doing it the other way round rejects real submissions in between.
+
+### Releasing
+
+On the server, per release:
+
+```bash
+npm ci --omit=dev     # postinstall runs `prisma generate`
+npm run build         # compiles TypeScript into build/
+npm run start:prod    # `prisma migrate deploy`, then serves
+```
+
+`start:prod` applies committed migrations before listening. `migrate deploy` is
+idempotent, so restarts and a second instance are both safe. Run it under a
+process manager (systemd, pm2) so the app comes back after a crash or reboot —
+`npm start` is for local use and rebuilds on every launch.
+
+Node 22 is what this is developed against. Prisma's query engine needs OpenSSL
+present on the host.
+
+`GET /health` answers without authentication, for uptime checks and load
+balancer probes.
+
+### Frontend
+
+The portal is a separate Vue SPA (`counselling-app`). Two things to know:
+
+- `VUE_APP_BASE_URL` is inlined at **build** time, so it cannot be changed
+  after the fact by setting an environment variable — a new API URL means a
+  rebuild. Nothing secret may go in it; it ships inside the JavaScript.
+- The router uses history mode, so the host must rewrite unknown paths to
+  `index.html`, or every deep link 404s on reload. `public/_redirects` covers
+  Netlify, Vercel and Cloudflare Pages; `nginx.conf` is the equivalent for
+  serving `dist/` from nginx yourself.
+
+Whatever origin the portal is served from must appear in the API's
+`CORS_ORIGINS` (or be its `APP_URL`), or every request from it is blocked.
