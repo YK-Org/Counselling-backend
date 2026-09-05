@@ -64,7 +64,10 @@ const getCounsellorSessions = async (request: Request, response: Response) => {
 
 router.get(
   "/reports/counsellors/sessions",
-  [MiddlewareService.queryValidation(PaginationQueryDTO)],
+  [
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.queryValidation(PaginationQueryDTO),
+  ],
   getCounsellorSessions
 );
 
@@ -137,7 +140,10 @@ const getAgeDistribution = async (request: Request, response: Response) => {
 
 router.get(
   "/reports/age",
-  [MiddlewareService.queryValidation(OptionalDateRangeQueryDTO)],
+  [
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.queryValidation(OptionalDateRangeQueryDTO),
+  ],
   getAgeDistribution
 );
 
@@ -179,7 +185,10 @@ const getCompletedSessionsOverTime = async (
 
 router.get(
   "/reports/completed/sessions",
-  [MiddlewareService.queryValidation(DateRangeQueryDTO)],
+  [
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.queryValidation(DateRangeQueryDTO),
+  ],
   getCompletedSessionsOverTime
 );
 
@@ -241,7 +250,10 @@ const getCouplesStatistics = async (request: Request, response: Response) => {
 
 router.get(
   "/reports/couples/statistics",
-  [MiddlewareService.queryValidation(DateRangeQueryDTO)],
+  [
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.queryValidation(DateRangeQueryDTO),
+  ],
   getCouplesStatistics
 );
 
@@ -464,7 +476,10 @@ const getCounsellorStatistics = async (request: Request, response: Response) => 
 
 router.get(
   "/reports/counsellors/statistics",
-  [MiddlewareService.queryValidation(OptionalDateRangeWithPaginationDTO)],
+  [
+    MiddlewareService.allowedRoles(["headCounsellor"]),
+    MiddlewareService.queryValidation(OptionalDateRangeWithPaginationDTO),
+  ],
   getCounsellorStatistics
 );
 

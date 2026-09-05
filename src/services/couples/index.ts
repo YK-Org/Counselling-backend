@@ -43,6 +43,14 @@ const counsellorSelect = {
   select: { id: true, firstName: true, lastName: true },
 };
 
+// The only filters the couples list accepts. Anything else in the query string
+// is dropped by the route before it reaches Prisma.
+export type CouplesFilter = {
+  counsellorId?: string | null;
+  counsellorAccepted?: string;
+  completed?: boolean;
+};
+
 class CouplesService {
   // Add a new partner to the couple that already contains `existingPartnerId`.
   async updateWithPartner(existingPartnerId: string, newPartnerId: string) {
@@ -228,10 +236,14 @@ class CouplesService {
     }
   }
 
-  async getCouples(query: any) {
+  // The filter is built by the route from a fixed whitelist, never handed
+  // straight through from the query string — `where` accepts nested Prisma
+  // operators, so an unfiltered query string let a caller write filters like
+  // `partners.some.phoneNumber.contains` and enumerate counsellees.
+  async getCouples(filter: CouplesFilter) {
     try {
       const response = await prisma.couple.findMany({
-        where: query,
+        where: filter,
         orderBy: { createdAt: "desc" },
         include: {
           partners: { select: { id: true, name: true } },

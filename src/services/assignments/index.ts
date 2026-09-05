@@ -3,10 +3,12 @@ import prisma from "../../prisma/client";
 const lessonInclude = { lesson: { select: { id: true, name: true } } };
 
 class AssignmentsService {
-  async getAssignments(query: any = {}) {
+  // Scoped to one couple by the route, which has already checked the caller is
+  // allowed to see it. Never takes a raw query string.
+  async getAssignments(filter: { couplesId: string }) {
     try {
       return await prisma.assignment.findMany({
-        where: query,
+        where: { couplesId: filter.couplesId },
         orderBy: { createdAt: "desc" },
         include: lessonInclude,
       });
