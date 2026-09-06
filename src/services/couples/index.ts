@@ -272,7 +272,13 @@ class CouplesService {
         include: {
           partners: {
             include: {
-              questionnaires: { include: { responses: true } },
+              // Newest first, so a partner who submitted twice has their most
+              // recent answers taken by the views, which pick the first
+              // questionnaire of the type they display.
+              questionnaires: {
+                include: { responses: true },
+                orderBy: { createdAt: "desc" },
+              },
             },
           },
           counsellor: counsellorSelect,

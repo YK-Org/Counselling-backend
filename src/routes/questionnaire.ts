@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import QuestionnaireService, {
   QuestionnaireType,
 } from "../services/questionnaire";
-import { omit } from "lodash";
+import { removeUnwantedCharacters } from "../helpers/removeUnwantedCharacters";
 import MiddlewareService from "../middleware/index";
 import { requireFormSecret } from "../middleware/formSubmission";
 import { handleError, handleValidationError } from "../helpers/errorHandler";
@@ -11,38 +11,81 @@ const router = express.Router();
 
 // Fields that identify the respondent rather than answer a question, so they
 // are stripped before the rest of the payload becomes question/answer rows.
-const META_FIELDS = ["Contact", "Name", "ReferenceCode", "Reference Code"];
+//
+// Titles are compared with spaces, full stops, apostrophes, question marks and
+// slashes removed, and case ignored — the same normalisation the intake form
+// applies via removeUnwantedCharacters. Without it these would have to match a
+// Google Form title character for character, and the live intake form already
+// has questions titled "Tel. No" and "Profession/Occupation", so exact
+// matching is not a workable assumption.
+const FIELD_ALIASES = {
+  contact: ["Contact", "Phone", "Phone Number", "Tel. No", "TelNo"],
+  name: ["Name", "Full Name"],
+  referenceCode: ["Reference Code", "Couple Code"],
+  gender: [
+    "Gender",
+    "Are you the husband or wife?",
+    "Which of you is filling this in?",
+    "Husband or Wife",
+    "Role",
+  ],
+};
+
+const normaliseKey = (key: string) =>
+  removeUnwantedCharacters(String(key)).toLowerCase();
+
+// Built once: normalised title -> which identifying field it supplies.
+const FIELD_BY_KEY = new Map<string, keyof typeof FIELD_ALIASES>();
+for (const [field, titles] of Object.entries(FIELD_ALIASES)) {
+  for (const title of titles) {
+    FIELD_BY_KEY.set(normaliseKey(title), field as keyof typeof FIELD_ALIASES);
+  }
+}
+
+// Splits a submission into the fields that say who sent it and the answers.
+const partitionSubmission = (data: Record<string, any>) => {
+  const submission: Record<string, string | undefined> = {};
+  const answers: { question: string; answer: string }[] = [];
+
+  for (const [key, raw] of Object.entries(data)) {
+    const field = FIELD_BY_KEY.get(normaliseKey(key));
+    const value = raw === undefined || raw === null ? "" : String(raw).trim();
+
+    if (field) {
+      // First non-empty wins, so a form carrying two spellings of the same
+      // thing does not lose the answered one to the blank one.
+      if (value && !submission[field]) submission[field] = value;
+      continue;
+    }
+
+    answers.push({ question: key, answer: value });
+  }
+
+  return { submission, answers };
+};
 
 const submitQuestionnaire = (type: QuestionnaireType) => {
   return async (request: Request, response: Response) => {
     try {
       const data = request.body || {};
-      const contact = data["Contact"];
-      const referenceCode = data["ReferenceCode"] ?? data["Reference Code"];
+      const { submission, answers } = partitionSubmission(data);
 
-      if (!contact && !referenceCode) {
+      if (!submission.contact && !submission.referenceCode) {
         return handleValidationError(
           response,
-          "A contact number or reference code is required"
+          "A reference code or contact number is required"
         );
       }
 
-      const questions: Record<string, unknown> = omit(data, META_FIELDS);
-      const formatQuestions = Object.keys(questions).map((item) => ({
-        question: item,
-        answer: String(questions[item] ?? ""),
-      }));
-
-      const { matched } = await QuestionnaireService.saveResponse(
-        contact,
-        formatQuestions,
-        type,
-        referenceCode
+      const { matched, reason } = await QuestionnaireService.saveResponse(
+        submission,
+        answers,
+        type
       );
 
-      // Mirrors the intake endpoint: the submission is always stored, and the
-      // response says whether it reached a couple.
-      return response.status(201).json({ matched });
+      // Always stored. `matched` says whether it reached a partner and is
+      // therefore visible on a couple's page; if not, it is in the queue.
+      return response.status(201).json({ matched, ...(reason ? { reason } : {}) });
     } catch (err: any) {
       return handleError(
         response,
@@ -105,6 +148,33 @@ router.get(
     MiddlewareService.allowedRoles(["headCounsellor", "counsellor"]),
   ],
   getQuestionnaire
+);
+
+const linkQuestionnaire = async (request: Request, response: Response) => {
+  try {
+    const { questionnaireId } = request.params;
+    const { partnerId } = request.body;
+
+    if (!partnerId) {
+      return handleValidationError(response, "partnerId is required");
+    }
+
+    const data = await QuestionnaireService.linkToPartner(
+      questionnaireId,
+      partnerId
+    );
+    return response.status(200).json(data);
+  } catch (err: any) {
+    // Already linked, unknown partner, partner with no couple — all states a
+    // person can correct, not server faults.
+    return handleValidationError(response, err.message);
+  }
+};
+
+router.put(
+  "/questionnaire/:questionnaireId/link",
+  [MiddlewareService.allowedRoles(["headCounsellor"])],
+  linkQuestionnaire
 );
 
 export default router;

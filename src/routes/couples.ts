@@ -7,6 +7,7 @@ import { handleError, handleValidationError } from "../helpers/errorHandler";
 import { requireFormSecret } from "../middleware/formSubmission";
 import CouplesDetailsService from "../services/couplesDetails";
 import CouplesService, { CouplesFilter } from "../services/couples";
+import QuestionnaireService from "../services/questionnaire";
 import { AuthenticatedRequest } from "../types";
 import { get } from "lodash";
 import { emitToHeadCounsellors } from "../socket";
@@ -186,12 +187,18 @@ const outstandingSubmissions = async (
   response: Response
 ) => {
   try {
-    const [unmatched, awaitingForms] = await Promise.all([
-      CouplesService.getUnmatchedSubmissions(),
-      CouplesService.getCouplesAwaitingForms(),
-    ]);
+    const [unmatched, awaitingForms, unlinkedQuestionnaires] =
+      await Promise.all([
+        CouplesService.getUnmatchedSubmissions(),
+        CouplesService.getCouplesAwaitingForms(),
+        // Questionnaires that reached no partner. The app loads them through
+        // the partner relation, so these appear on no couple's page and this
+        // list is the only way back to them.
+        QuestionnaireService.getUnlinkedQuestionnaires(),
+      ]);
     return response.status(200).json({
       unmatched,
+      unlinkedQuestionnaires,
       // Chasing up a missing form is the main reason to look at this list, so
       // the link to send them comes with it.
       awaitingForms: awaitingForms.map((couple) => ({

@@ -172,6 +172,16 @@ model Questionnaire {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // What the respondent actually typed, kept verbatim and separately from the
+  // resolved links below. A submission that cannot be matched has no partner
+  // and no couple, so without these there is nothing left to identify it by —
+  // the identifying fields were stripped before the answers were stored, and
+  // an unmatched row was an anonymous list of answers nobody could place.
+  submittedContact       String?
+  submittedName          String?
+  submittedReferenceCode String?
+  submittedGender        String?
+
   partnerId String?
   partner   Partner? @relation(fields: [partnerId], references: [id])
   coupleId  String?
