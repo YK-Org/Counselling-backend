@@ -286,7 +286,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
       return response.status(500).json({ message: "Failed to upload image" });
     }
 
-    // Store the Google Drive file ID
+    // Store the storage key
     const previous = await UserService.getUser(userId);
     await UserService.updateUser(
       { profilePicture: uploadedFiles[0].id },
@@ -294,7 +294,7 @@ const uploadProfilePicture = async (request: Request, response: Response) => {
     );
 
     // Drop the superseded image. Nothing references it once the column moves
-    // on, so leaving it would accumulate orphans in Drive and on disk.
+    // on, so leaving it would accumulate orphans in the bucket.
     if (previous?.profilePicture) {
       await StorageService.deleteFiles([previous.profilePicture]).catch(
         (err: any) =>

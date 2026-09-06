@@ -2,9 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import * as jwt from "jsonwebtoken";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
-import { get } from "lodash";
-import CouplesService from "../services/couples";
 import UsersService from "../services/users";
+import { canAccessCouple } from "../helpers/coupleAccess";
 import { JwtPayload } from "jsonwebtoken";
 
 class MiddlewareService {
@@ -92,20 +91,8 @@ class MiddlewareService {
   };
 
   canAccessCouple = async (req: any, res: Response, next: any) => {
-    const role = get(req, "user.role", "");
-    if (role == "headCounsellor") {
-      return next();
-    }
-
-    const coupleId = req.params.coupleId;
-    const userId = get(req, "user.id", "");
-    const couple = await CouplesService.getCouple({ id: coupleId });
-
-    if (couple?.counsellorId && userId === couple.counsellorId.toString()) {
-      return next();
-    }
-
-    return res.sendStatus(403);
+    const permitted = await canAccessCouple(req.user, req.params.coupleId);
+    return permitted ? next() : res.sendStatus(403);
   };
 
   allowedRoles(roles: string[]) {

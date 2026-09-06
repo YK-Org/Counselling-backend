@@ -1,15 +1,9 @@
 import app from "./app";
 import prisma from "./prisma/client";
 import { initialize } from "./socket";
-import { v2 as cloudinary } from "cloudinary";
 
-const { PORT, CLOUD_NAME, API_KEY, API_SECRET } = process.env;
+const { PORT } = process.env;
 
-cloudinary.config({
-  cloud_name: CLOUD_NAME,
-  api_key: API_KEY,
-  api_secret: API_SECRET,
-});
 
 const port = PORT || 3000;
 

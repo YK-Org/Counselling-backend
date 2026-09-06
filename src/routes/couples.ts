@@ -2,12 +2,15 @@ import express, { Request, Response } from "express";
 import { transformFormData } from "../helpers/transformFormData";
 import { normaliseReferenceCode } from "../helpers/referenceCode";
 import { toE164 } from "../helpers/phoneNumber";
+import { buildIntakeFormLink } from "../helpers/intakeForm";
 import { handleError, handleValidationError } from "../helpers/errorHandler";
 import { requireFormSecret } from "../middleware/formSubmission";
 import CouplesDetailsService from "../services/couplesDetails";
-import CouplesService from "../services/couples";
+import CouplesService, { CouplesFilter } from "../services/couples";
+import QuestionnaireService from "../services/questionnaire";
+import { AuthenticatedRequest } from "../types";
 import { get } from "lodash";
-import { getIO } from "../socket";
+import { emitToHeadCounsellors } from "../socket";
 import LessonsService from "../services/lessons";
 import StorageService from "../services/storage";
 import MiddlewareService from "../middleware/index";
@@ -47,11 +50,13 @@ const addCouples = async (request: Request, response: Response) => {
     const ids = partners.map((result: any) => result.value.id);
     const couple = await CouplesService.createPartner(ids, uploadedFiles[0]);
     const data = await CouplesService.getCouple({ id: couple.id });
-    // The reference code is the point of this response — both partners need it
-    // to fill in the intake form.
-    return response
-      .status(201)
-      .json({ ...data, referenceCode: couple.referenceCode });
+    // The code and its prefilled link are the point of this response — both
+    // partners need one or the other to fill in the intake form.
+    return response.status(201).json({
+      ...data,
+      referenceCode: couple.referenceCode,
+      formLink: buildIntakeFormLink(couple.referenceCode),
+    });
   } catch (err: any) {
     return response.status(500).json({ message: err.message });
   }
@@ -118,7 +123,7 @@ const addCouplesDetails = async (request: Request, response: Response) => {
             slot.id,
             formattedData
           );
-          getIO().to("headcounsellor").emit("formSubmitted");
+          emitToHeadCounsellors("formSubmitted");
           return response.status(201).json({ matched: true });
         }
       }
@@ -161,7 +166,7 @@ const addCouplesDetails = async (request: Request, response: Response) => {
       // creating a half-empty couple that looks ready to assign.
     }
 
-    getIO().to("headcounsellor").emit("formSubmitted");
+    emitToHeadCounsellors("formSubmitted");
 
     const saved = await CouplesDetailsService.findPartner(
       details.phoneNumber as string
@@ -182,11 +187,25 @@ const outstandingSubmissions = async (
   response: Response
 ) => {
   try {
-    const [unmatched, awaitingForms] = await Promise.all([
-      CouplesService.getUnmatchedSubmissions(),
-      CouplesService.getCouplesAwaitingForms(),
-    ]);
-    return response.status(200).json({ unmatched, awaitingForms });
+    const [unmatched, awaitingForms, unlinkedQuestionnaires] =
+      await Promise.all([
+        CouplesService.getUnmatchedSubmissions(),
+        CouplesService.getCouplesAwaitingForms(),
+        // Questionnaires that reached no partner. The app loads them through
+        // the partner relation, so these appear on no couple's page and this
+        // list is the only way back to them.
+        QuestionnaireService.getUnlinkedQuestionnaires(),
+      ]);
+    return response.status(200).json({
+      unmatched,
+      unlinkedQuestionnaires,
+      // Chasing up a missing form is the main reason to look at this list, so
+      // the link to send them comes with it.
+      awaitingForms: awaitingForms.map((couple) => ({
+        ...couple,
+        formLink: buildIntakeFormLink(couple.referenceCode),
+      })),
+    });
   } catch (err: any) {
     return handleError(
       response,
@@ -307,14 +326,48 @@ router.put(
   assignCounsellor
 );
 
+// Builds the couples-list filter from a fixed set of query parameters. The
+// query string used to be passed to Prisma as `where` verbatim, which both
+// skipped every access check and accepted arbitrary nested operators.
+const buildCouplesFilter = (
+  query: any,
+  user: { id: string; role: string }
+): CouplesFilter => {
+  const filter: CouplesFilter = {};
+
+  if (typeof query.counsellorAccepted === "string") {
+    filter.counsellorAccepted = query.counsellorAccepted;
+  }
+  if (query.completed === "true") filter.completed = true;
+  if (query.completed === "false") filter.completed = false;
+
+  // A counsellor sees their own couples and nothing else. The portal already
+  // sent `counsellorId` for them, but that was a client-side courtesy: calling
+  // the endpoint directly with no parameters returned every couple in the
+  // system. Their own id is forced here, overriding whatever was asked for.
+  if (user.role !== "headCounsellor") {
+    filter.counsellorId = user.id;
+    return filter;
+  }
+
+  // A head counsellor may scope to one counsellor — that is the counsellor
+  // detail page — or pass nothing and see everything.
+  if (typeof query.counsellorId === "string" && query.counsellorId) {
+    filter.counsellorId = query.counsellorId;
+  }
+
+  return filter;
+};
+
 const getCouples = async (request: Request, response: Response) => {
   try {
-    const query = request.query;
-    const data = await CouplesService.getCouples(query);
+    const user = (request as AuthenticatedRequest).user;
+    const filter = buildCouplesFilter(request.query, user);
+    const data = await CouplesService.getCouples(filter);
     const totalLessons = await LessonsService.countLessons();
     return response.status(200).json({ couples: data, totalLessons });
   } catch (err: any) {
-    return response.status(500).json({ message: err.message });
+    return handleError(response, err, "getCouples", "Failed to fetch couples");
   }
 };
 

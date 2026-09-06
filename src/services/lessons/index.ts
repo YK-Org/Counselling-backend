@@ -10,9 +10,23 @@ class LessonsService {
     }
   }
 
-  async getLessons(query: any = {}) {
+  async getLessons() {
     try {
-      return await prisma.lesson.findMany({ where: query });
+      return await prisma.lesson.findMany({ orderBy: { createdAt: "asc" } });
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  }
+
+  // What is pointing at this lesson, so the route can refuse a delete that the
+  // database would reject anyway — and explain why.
+  async countLessonUsage(lessonId: string) {
+    try {
+      const [completions, assignments] = await Promise.all([
+        prisma.coupleLessonCompleted.count({ where: { lessonId } }),
+        prisma.assignment.count({ where: { lessonId } }),
+      ]);
+      return { completions, assignments };
     } catch (e: any) {
       throw new Error(e.message);
     }
