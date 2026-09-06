@@ -18,7 +18,20 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Pooled connection, used for ordinary queries. A serverless Postgres puts a
+  // connection pooler in front, which is what lets many short-lived
+  // connections share a small number of real ones.
   url      = env("DATABASE_URL")
+  // Unpooled connection, used only for migrations. Schema changes need a real
+  // session — the pooler runs in transaction mode and hands out a different
+  // backend per statement, so `migrate deploy` cannot rely on session state
+  // and will misbehave against it.
+  //
+  // This is required once declared: Prisma fails to load the schema if
+  // DIRECT_URL is missing, it does not fall back. On a plain single-server
+  // Postgres, where there is no pooler and no distinction to make, set it to
+  // the same value as DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
