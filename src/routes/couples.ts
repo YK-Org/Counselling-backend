@@ -9,6 +9,7 @@ import CouplesDetailsService from "../services/couplesDetails";
 import CouplesService, { CouplesFilter } from "../services/couples";
 import QuestionnaireService from "../services/questionnaire";
 import { AuthenticatedRequest } from "../types";
+import AuditService, { AUDIT_ACTIONS } from "../services/audit";
 import { get } from "lodash";
 import { emitToHeadCounsellors } from "../socket";
 import LessonsService from "../services/lessons";
@@ -381,6 +382,18 @@ const getCouple = async (request: Request, response: Response) => {
   try {
     const coupleId = request.params.coupleId;
     const data = await CouplesService.getCouple({ id: coupleId });
+
+    // Opening a couple's record means reading their intake answers — sexual
+    // history, abuse disclosures, health. Who read what is exactly what an
+    // investigation would need and cannot be reconstructed later.
+    AuditService.track({
+      action: AUDIT_ACTIONS.COUPLE_VIEWED,
+      actor: (request as AuthenticatedRequest).user,
+      targetType: "couple",
+      targetId: coupleId,
+      request,
+    });
+
     return response.status(200).json(data);
   } catch (err: any) {
     return response.status(500).json({ message: err.message });

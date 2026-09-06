@@ -6,6 +6,8 @@ import { removeUnwantedCharacters } from "../helpers/removeUnwantedCharacters";
 import MiddlewareService from "../middleware/index";
 import { requireFormSecret } from "../middleware/formSubmission";
 import { handleError, handleValidationError } from "../helpers/errorHandler";
+import { AuthenticatedRequest } from "../types";
+import AuditService, { AUDIT_ACTIONS } from "../services/audit";
 
 const router = express.Router();
 
@@ -130,6 +132,16 @@ const getQuestionnaire = async (request: Request, response: Response) => {
       coupleId,
       type
     );
+
+    AuditService.track({
+      action: AUDIT_ACTIONS.QUESTIONNAIRE_VIEWED,
+      actor: (request as AuthenticatedRequest).user,
+      targetType: "couple",
+      targetId: coupleId,
+      request,
+      metadata: { type },
+    });
+
     return response.status(200).json(data);
   } catch (err: any) {
     return handleError(
@@ -163,6 +175,16 @@ const linkQuestionnaire = async (request: Request, response: Response) => {
       questionnaireId,
       partnerId
     );
+
+    AuditService.track({
+      action: AUDIT_ACTIONS.QUESTIONNAIRE_LINKED,
+      actor: (request as AuthenticatedRequest).user,
+      targetType: "questionnaire",
+      targetId: questionnaireId,
+      request,
+      metadata: { partnerId },
+    });
+
     return response.status(200).json(data);
   } catch (err: any) {
     // Already linked, unknown partner, partner with no couple — all states a

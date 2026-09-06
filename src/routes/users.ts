@@ -18,6 +18,7 @@ import {
 import { FILE_UPLOAD_LIMITS } from "../constants/counsellor-status";
 import { AuthenticatedRequest } from "../types";
 import { passwordRuleError } from "../helpers/password";
+import AuditService, { AUDIT_ACTIONS } from "../services/audit";
 import {
   uploadLimiter,
   passwordChangeLimiter,
@@ -168,6 +169,15 @@ const inviteUser = async (request: Request, response: Response) => {
         code: mailError?.code,
       });
     }
+
+    AuditService.track({
+      action: AUDIT_ACTIONS.USER_INVITED,
+      actor: (request as AuthenticatedRequest).user,
+      targetType: "user",
+      targetId: user.id,
+      request,
+      metadata: { email, role, inviteEmailSent },
+    });
 
     return response.status(201).json({ ...userData, inviteEmailSent });
   } catch (err: any) {

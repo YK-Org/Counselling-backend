@@ -4,6 +4,7 @@ import MediaAccessService from "../services/mediaAccess";
 import MiddlewareService from "../middleware/index";
 import { handleForbiddenError } from "../helpers/errorHandler";
 import { AuthenticatedRequest } from "../types";
+import AuditService, { AUDIT_ACTIONS } from "../services/audit";
 import archiver from "archiver";
 import path from "path";
 
@@ -29,6 +30,17 @@ const viewMedia = async (request: Request, response: Response) => {
       // cannot be used to discover which keys are real.
       return handleForbiddenError(response);
     }
+
+    // Logged once the request is authorised and before bytes move, so the
+    // trail records the intent even if the transfer then fails.
+    AuditService.track({
+      action: AUDIT_ACTIONS.MEDIA_DOWNLOADED,
+      actor: user,
+      targetType: "media",
+      targetId: mediaIds.length === 1 ? mediaIds[0] : undefined,
+      request,
+      metadata: { keys: mediaIds, count: mediaIds.length },
+    });
 
     if (mediaIds.length === 1) {
       const key = mediaIds[0];

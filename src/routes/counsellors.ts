@@ -8,6 +8,8 @@ import {
   handleValidationError,
 } from "../helpers/errorHandler";
 import { userStatus } from "../types/models/Users";
+import { AuthenticatedRequest } from "../types";
+import AuditService, { AUDIT_ACTIONS } from "../services/audit";
 
 const router = express.Router();
 
@@ -113,6 +115,18 @@ const updateCounsellor = async (request: Request, response: Response) => {
       { ...body, ...(revokesSession ? { tokenIssuedAt: null } : {}) },
       counsellorId
     );
+    AuditService.track({
+      action: AUDIT_ACTIONS.USER_UPDATED,
+      actor: (request as AuthenticatedRequest).user,
+      targetType: "user",
+      targetId: counsellorId,
+      request,
+      // The changed fields, not their previous values — status and
+      // availability are the ones that matter, and a ban is the reason this
+      // endpoint is worth recording at all.
+      metadata: { changed: Object.keys(body), status: body.status, sessionRevoked: revokesSession },
+    });
+
     return response.status(200).json(omit(data, ["password","resetTokenId", "tokenIssuedAt"]));
   } catch (err: any) {
     return handleError(

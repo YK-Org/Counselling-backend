@@ -17,11 +17,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // Pooled connection, used for ordinary queries. A serverless Postgres puts a
   // connection pooler in front, which is what lets many short-lived
   // connections share a small number of real ones.
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // Unpooled connection, used only for migrations. Schema changes need a real
   // session — the pooler runs in transaction mode and hands out a different
   // backend per statement, so `migrate deploy` cannot rely on session state
@@ -51,26 +51,32 @@ enum Gender {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  email          String     @unique
-  firstName      String
-  lastName       String
-  password       String
-  phoneNumber    String?
-  role           UserRole
-  status         UserStatus @default(awaitingConfirmation)
-  availability   Boolean    @default(true)
-  tokenIssuedAt  Int?
+  id                  String     @id @default(cuid())
+  email               String     @unique
+  firstName           String
+  lastName            String
+  password            String
+  phoneNumber         String?
+  role                UserRole
+  status              UserStatus @default(awaitingConfirmation)
+  availability        Boolean    @default(true)
+  tokenIssuedAt       Int?
   // Nonce for the outstanding password-reset/invite link. Matched against the
   // token's claim and cleared on use, which is what makes those links
   // single-use — JWT `iat` is second-granular and cannot express this.
-  resetTokenId   String?
-  profilePicture String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  resetTokenId        String?
+  profilePicture      String?
+  // Consecutive failed sign-ins, reset on success. Rate limiting alone is by
+  // IP, which both locks out a whole office sharing one connection and does
+  // little against attempts spread across many addresses at one account.
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   // A counsellor is assigned to many couples
-  couples Couple[] @relation("CounsellorCouples")
+  couples   Couple[]   @relation("CounsellorCouples")
+  auditLogs AuditLog[]
 
   @@index([role])
   @@index([role, availability])
@@ -94,10 +100,10 @@ model Couple {
   counsellor   User?   @relation("CounsellorCouples", fields: [counsellorId], references: [id])
 
   // partners[] on the Mongo model -> one couple has many partner records
-  partners        Partner[]
+  partners         Partner[]
   lessonsCompleted CoupleLessonCompleted[]
-  assignments     Assignment[]
-  questionnaires  Questionnaire[]
+  assignments      Assignment[]
+  questionnaires   Questionnaire[]
 
   @@index([counsellorId])
   @@index([completed])
@@ -167,7 +173,7 @@ model CoupleLessonCompleted {
 
 model Assignment {
   id        String   @id @default(cuid())
-  uploads   Json?    // [{ id, name }]
+  uploads   Json? // [{ id, name }]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -229,7 +235,48 @@ model Form {
 model Resource {
   id        String   @id @default(cuid())
   name      String
-  uploads   Json?    // [{ id, name }]
+  uploads   Json? // [{ id, name }]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Who did what, to whose record, and when.
+//
+// These are counselling files — sexual history, abuse disclosures, health
+// status — and until now nothing recorded that a given counsellor opened a
+// given couple's record or downloaded their letter. That is the first thing
+// anyone investigating a suspected breach would ask for, and it cannot be
+// reconstructed after the fact.
+//
+// Rows are written for reads as well as writes, and are never updated: an
+// audit trail that can be edited is not one.
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // e.g. "couple.view", "media.download", "auth.login.failed"
+  createdAt DateTime @default(now())
+
+  // Nullable because a failed sign-in has no authenticated actor. The email is
+  // stored alongside the id so the trail still reads correctly once an account
+  // is deleted, and so a failed attempt on an unknown address is still useful.
+  actorId    String?
+  actor      User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorEmail String?
+  actorRole  String?
+
+  // What was acted on: "couple", "partner", "media", "user", "questionnaire".
+  targetType String?
+  targetId   String?
+
+  // Request context, for telling a routine action apart from an odd one.
+  ipAddress String?
+  userAgent String?
+
+  // Anything else worth keeping — which media keys, which fields changed.
+  // Never the record contents themselves; this is a trail, not a copy.
+  metadata Json?
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([action])
+  @@index([targetType, targetId])
 }
