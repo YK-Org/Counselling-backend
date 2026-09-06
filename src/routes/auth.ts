@@ -13,6 +13,7 @@ import {
   passwordRequestMailText,
 } from "../helpers/mailTemplate";
 import { authLimiter } from "../middleware/rateLimiter";
+import { passwordRuleError } from "../helpers/password";
 
 const router = express.Router();
 
@@ -21,13 +22,33 @@ const login = async (request: Request, response: Response) => {
     const { email, password } = request.body;
 
     const user = await UserService.getUsers({ email });
-    if (user?.length && user[0].status === "awaitingConfirmation") {
-      throw new Error("Account has not been confirmed");
+    const account = user?.length ? user[0] : null;
+
+    // The password is checked before the account state, so a wrong guess
+    // always gets the same answer. Reporting "not confirmed" or "disabled"
+    // first told anyone who asked which addresses have accounts.
+    const passwordMatches = account
+      ? await bcrypt.compare(password, account.password)
+      : false;
+
+    if (!account || !passwordMatches) {
+      throw new Error("Invalid Credentials");
     }
 
-    if (user?.length && (await bcrypt.compare(password, user[0].password))) {
+    // Only an active account may sign in. `banned` was not checked at all, so
+    // banning a counsellor left them able to log in exactly as before — the
+    // one control for removing someone's access to counselling records did
+    // nothing.
+    if (account.status === "awaitingConfirmation") {
+      throw new Error("Account has not been confirmed");
+    }
+    if (account.status !== "active") {
+      throw new Error("This account has been disabled");
+    }
+
+    {
       const userData: any = {
-        ...omit(user[0], [
+        ...omit(account, [
           "password",
           "resetTokenId",
           "__v",
@@ -45,11 +66,9 @@ const login = async (request: Request, response: Response) => {
         {
           tokenIssuedAt: token.issuedAt,
         },
-        user[0].id
+        account.id
       );
       return response.status(200).send(data);
-    } else {
-      throw new Error("Invalid Credentials");
     }
   } catch (error: any) {
     return response.status(400).send(error.message);
@@ -160,6 +179,15 @@ const forgotPasswordReset = async (request: Request, response: Response) => {
   try {
     const password = request.body.password;
     const id = (request as any).user.id;
+
+    // This endpoint also consumes invite links, so it sets every counsellor's
+    // first password. It previously accepted anything at all, which made the
+    // account-creation path the one with no strength requirement.
+    const passwordError = passwordRuleError(password);
+    if (passwordError) {
+      return response.status(400).send({ message: passwordError });
+    }
+
     const encryptedUserPassword = await bcrypt.hash(password, 10);
 
     // Consuming an invite link is what activates the account — setting a

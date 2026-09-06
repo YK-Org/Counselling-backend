@@ -103,7 +103,16 @@ const updateCounsellor = async (request: Request, response: Response) => {
       return handleNotFoundError(response, "Counsellor not found");
     }
 
-    const data = await UserService.updateUser(body, counsellorId);
+    // Taking someone out of `active` must end the session they already have,
+    // not merely stop the next sign-in. tokenIssuedAt is what every request is
+    // checked against, so clearing it invalidates their current token at once.
+    const revokesSession =
+      body.status !== undefined && body.status !== "active";
+
+    const data = await UserService.updateUser(
+      { ...body, ...(revokesSession ? { tokenIssuedAt: null } : {}) },
+      counsellorId
+    );
     return response.status(200).json(omit(data, ["password","resetTokenId", "tokenIssuedAt"]));
   } catch (err: any) {
     return handleError(

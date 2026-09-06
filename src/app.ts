@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import routes from "./routes";
 import dotenv from "dotenv";
 import MiddlewareService from "./middleware/index";
@@ -18,6 +19,21 @@ if (trustProxy) {
   const hops = Number(trustProxy);
   app.set("trust proxy", Number.isFinite(hops) ? hops : trustProxy);
 }
+
+// Security response headers. Set before anything else so they apply to every
+// response, including errors and rejected requests.
+app.use(
+  helmet({
+    // The portal is served from a different origin and downloads counselling
+    // letters and assignments through /media. Helmet's default of same-origin
+    // would have the browser refuse those responses.
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    // This API returns JSON, never a document, so the referrer policy and
+    // frame protections matter little — but HSTS does, and it is on by
+    // default: it tells browsers never to attempt this host over plain HTTP
+    // again, which closes the downgrade window on a token in transit.
+  })
+);
 
 app.use(express.json());
 

@@ -36,10 +36,18 @@ class MiddlewareService {
 
         req.user = decoded.user;
         const user = await UsersService.getUser(req.user.id);
-        if (!user || (user && decoded.iat !== user.tokenIssuedAt)) {
+        if (!user || decoded.iat !== user.tokenIssuedAt) {
           return res
             .status(403)
             .json({ message: "Token has been invalidated." });
+        }
+
+        // Status is checked on every request, not only at sign-in. Banning
+        // used to leave an existing session working until its token expired,
+        // so someone could be removed and still read counselling records for
+        // up to a day.
+        if (user.status !== "active") {
+          return res.status(403).json({ message: "Account is not active." });
         }
 
         next();

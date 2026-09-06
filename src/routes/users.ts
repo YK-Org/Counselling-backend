@@ -17,6 +17,7 @@ import {
 } from "../helpers/errorHandler";
 import { FILE_UPLOAD_LIMITS } from "../constants/counsellor-status";
 import { AuthenticatedRequest } from "../types";
+import { passwordRuleError } from "../helpers/password";
 import {
   uploadLimiter,
   passwordChangeLimiter,
@@ -204,13 +205,9 @@ const changePassword = async (request: Request, response: Response) => {
       );
     }
 
-    // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return handleValidationError(
-        response,
-        "Password must be at least 8 characters with uppercase, lowercase, number, and special character"
-      );
+    const passwordError = passwordRuleError(password);
+    if (passwordError) {
+      return handleValidationError(response, passwordError);
     }
 
     const getUser = await UserService.getUser(id);
