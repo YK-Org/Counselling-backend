@@ -75,7 +75,7 @@ router.post(
 // Chooses which partner record in a couple a submission belongs to. Phone
 // first because it is the strongest signal available, then gender, then any
 // slot still waiting on a form — a couple only ever has two.
-const resolveSlot = (couple: any, submittedPhone?: string, gender?: string) => {
+export const resolveSlot = (couple: any, submittedPhone?: string, gender?: string) => {
   // A number already on the couple means this is that same person submitting
   // again — a correction or a second attempt — so they may update their own
   // record even though it is already filled in.
@@ -330,7 +330,7 @@ router.put(
 // Builds the couples-list filter from a fixed set of query parameters. The
 // query string used to be passed to Prisma as `where` verbatim, which both
 // skipped every access check and accepted arbitrary nested operators.
-const buildCouplesFilter = (
+export const buildCouplesFilter = (
   query: any,
   user: { id: string; role: string }
 ): CouplesFilter => {

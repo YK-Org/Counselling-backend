@@ -177,3 +177,57 @@ The portal is a separate Vue SPA (`counselling-app`). Two things to know:
 
 Whatever origin the portal is served from must appear in the API's
 `CORS_ORIGINS` (or be its `APP_URL`), or every request from it is blocked.
+
+---
+
+## Tests
+
+```bash
+npm test              # everything
+npm run test:unit     # no database needed
+npm run test:integration
+npm run test:watch
+```
+
+The unit tests cover the pure matching logic — reference-code normalisation,
+phone normalisation, gender aliases, which partner slot a submission belongs
+to, the couples-list filter and the password rule. They need nothing but Node.
+
+The integration tests cover authorisation and matching as they actually run,
+against a real Postgres. Mocking Prisma would only test the mock: whether a
+counsellor may open a couple's record is decided by a join, so the join has to
+happen. Start a database and point the suite at it:
+
+```bash
+docker run -d --name counselling-test -p 55432:5432 \
+  -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=test \
+  postgres:16-alpine
+
+export TEST_DATABASE_URL="postgresql://test:test@localhost:55432/test"
+npm test
+```
+
+Migrations are applied automatically on the first run. **Without
+`TEST_DATABASE_URL` the integration suites skip rather than fail**, so `npm
+test` still passes for someone who only wants the unit tests — but it then
+covers a fraction of what matters, so CI should set it.
+
+### What is covered, and why these
+
+Each of these pins behaviour that was once wrong here, or that would be
+expensive to get wrong later:
+
+| Area | Covers |
+| --- | --- |
+| Couples list | a counsellor sees only their own couples, cannot ask for another's, and nested Prisma operators in the query string are ignored |
+| Couple detail | assigned counsellor allowed, other counsellors refused, and a non-existent id answers the same as a forbidden one |
+| Reports | every endpoint refuses a counsellor and allows a head counsellor |
+| Assignments | a couple must be named; reading, creating and deleting against another counsellor's couple are all refused, and the record survives |
+| Media | keys belonging to another couple, to nothing, or to profile pictures are refused, and one bad key in a batch refuses the whole request |
+| Banning | blocks sign-in, ends the session already held, clears tokenIssuedAt, and reverses cleanly |
+| Disclosure | a wrong password and an unknown address give byte-identical answers |
+| Lockout | locks after repeated failures, does not affect colleagues on the same address, resets on success, expires |
+| Passwords | one rule on both the change and reset paths; invite links activate an account and cannot be reused |
+| Matching | code plus gender attributes correctly with no usable phone; disagreement between gender and phone queues instead of guessing; unknown codes keep the answers; identifying fields are not stored as answers |
+| Queue | unlinked submissions list with their candidates, attach to a partner, become visible on the couple's page, and cannot be attached twice |
+| Form secret | fails open while unset, rejects a missing or wrong header once set, and does not leak the expected value |

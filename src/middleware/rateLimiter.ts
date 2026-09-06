@@ -1,12 +1,22 @@
 import rateLimit from "express-rate-limit";
 
+// Limits are overridable so they can be tuned for a deployment without a code
+// change, and raised in the test suite — which makes hundreds of requests from
+// one address and would otherwise trip the very limiter it is trying to test
+// around. The defaults are the production values.
+const limitFrom = (name: string, fallback: number) => {
+  const raw = process.env[name];
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 /**
  * General API rate limiter
  * Limits: 100 requests per 15 minutes per IP
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: limitFrom("RATE_LIMIT_API_MAX", 100),
   message: {
     message: "Too many requests from this IP, please try again later.",
   },
@@ -29,7 +39,7 @@ export const apiLimiter = rateLimit({
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  max: limitFrom("RATE_LIMIT_AUTH_MAX", 20),
   // A successful sign-in does not count, so ordinary use by a shared office
   // never approaches the limit however many people log in.
   skipSuccessfulRequests: true,
